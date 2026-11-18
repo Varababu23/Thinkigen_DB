@@ -85,7 +85,8 @@ BEGIN TRY
 
     INSERT INTO management_schema.exam_schedule
       (exam_schedule_id, exam_id, school_id, branch_id, academic_year_id, class_id, section_id,
-       subject_id, teacher_id, exam_date, start_time, end_time, max_marks, pass_marks, status, is_active, created_by)
+       subject_id, teacher_id, exam_date, start_time, end_time, max_marks, pass_marks,
+       evaluation_start_date, evaluation_end_date, status, is_active, created_by)
     SELECT
       @MaxScheduleId + ROW_NUMBER() OVER (ORDER BY e.exam_id, s.subject_id),
       e.exam_id,
@@ -109,6 +110,22 @@ BEGIN TRY
       CAST('11:30' AS TIME(0)),
       50.00,                                         -- max_marks: 50
       20.00,                                         -- pass_marks: 20
+      CASE s.subject_id
+          WHEN 1 THEN CAST('2026-10-09' AS DATE)
+          WHEN 2 THEN CAST('2026-10-10' AS DATE)
+          WHEN 3 THEN CAST('2026-10-12' AS DATE)
+          WHEN 4 THEN CAST('2026-10-13' AS DATE)
+          WHEN 5 THEN CAST('2026-10-14' AS DATE)
+          WHEN 6 THEN CAST('2026-10-15' AS DATE)
+      END,
+      CASE s.subject_id
+          WHEN 1 THEN CAST('2026-10-15' AS DATE)
+          WHEN 2 THEN CAST('2026-10-16' AS DATE)
+          WHEN 3 THEN CAST('2026-10-17' AS DATE)
+          WHEN 4 THEN CAST('2026-10-19' AS DATE)
+          WHEN 5 THEN CAST('2026-10-20' AS DATE)
+          WHEN 6 THEN CAST('2026-10-21' AS DATE)
+      END,
       N'SCHEDULED',                                  -- status: SCHEDULED
       1,                                             -- is_active
       1                                              -- created_by

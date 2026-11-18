@@ -16,7 +16,6 @@ from typing import Optional, List, Dict, Any
 
 from app.schemas.student_attentions import (
     AttentionType,
-    AttentionSeverity,
     TriggerSource,
     AttentionStatus,
     AttentionItemBase,
@@ -109,8 +108,8 @@ class StudentAttentionService:
                     "class_name": class_name,
                     "section_id": section_id,
                     "section_name": section_name,
+                    "total_attentions_raised": 0,
                     "total_active_attentions": 0,
-                    "critical_attentions_count": 0,
                     "subjects": [],
                     "is_active": 1,
                     "created_at": now,
@@ -138,6 +137,7 @@ class StudentAttentionService:
                         "subject_code": subject_code,
                         "assigned_teacher_id": assigned_teacher_id,
                         "assigned_teacher_name": assigned_teacher_name,
+                        "total_attentions_raised": 0,
                         "active_attentions_count": 0,
                         "attentions": [],
                         "subject_summary": None,
@@ -160,7 +160,6 @@ class StudentAttentionService:
                 "$set": {
                     "subjects.$[sub].attentions.$[att].title": attention_item.title,
                     "subjects.$[sub].attentions.$[att].description": attention_item.description,
-                    "subjects.$[sub].attentions.$[att].severity": attention_item.severity.value,
                     "subjects.$[sub].attentions.$[att].assessment_details": (
                         attention_item.assessment_details.model_dump()
                         if attention_item.assessment_details
@@ -370,6 +369,9 @@ class StudentAttentionService:
                                 "$mergeObjects": [
                                     "$$sub",
                                     {
+                                        "total_attentions_raised": {
+                                            "$size": "$$sub.attentions"
+                                        },
                                         "active_attentions_count": {
                                             "$size": {
                                                 "$filter": {
@@ -388,36 +390,18 @@ class StudentAttentionService:
             },
             {
                 "$set": {
+                    "total_attentions_raised": {
+                        "$reduce": {
+                            "input": "$subjects",
+                            "initialValue": 0,
+                            "in": {"$add": ["$$value", "$$this.total_attentions_raised"]},
+                        }
+                    },
                     "total_active_attentions": {
                         "$reduce": {
                             "input": "$subjects",
                             "initialValue": 0,
                             "in": {"$add": ["$$value", "$$this.active_attentions_count"]},
-                        }
-                    },
-                    "critical_attentions_count": {
-                        "$reduce": {
-                            "input": "$subjects",
-                            "initialValue": 0,
-                            "in": {
-                                "$add": [
-                                    "$$value",
-                                    {
-                                        "$size": {
-                                            "$filter": {
-                                                "input": "$$this.attentions",
-                                                "as": "att",
-                                                "cond": {
-                                                    "$and": [
-                                                        {"$eq": ["$$att.status", "ACTIVE"]},
-                                                        {"$eq": ["$$att.severity", "CRITICAL"]},
-                                                    ]
-                                                },
-                                            }
-                                        }
-                                    },
-                                ]
-                            },
                         }
                     },
                     "updated_at": datetime.now(timezone.utc),
@@ -541,7 +525,6 @@ class StudentAttentionService:
                         "$sum": {"$cond": [{"$gt": ["$total_active_attentions", 0]}, 1, 0]}
                     },
                     "total_active_alerts": {"$sum": "$total_active_attentions"},
-                    "total_critical_alerts": {"$sum": "$critical_attentions_count"},
                 }
             },
             {

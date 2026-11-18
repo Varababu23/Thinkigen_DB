@@ -723,6 +723,8 @@ COLUMNS (name | type | null | column purpose):
   end_time                         | TIME(0)                | NOT NULL | 
   max_marks                        | DECIMAL(6, 2)          | NOT NULL | 
   pass_marks                       | DECIMAL(6, 2)          | NULL     | 
+  evaluation_start_date            | DATE                   | NULL     | Paper evaluation start date (>= exam_date)
+  evaluation_end_date              | DATE                   | NULL     | Deadline for paper evaluation (>= evaluation_start_date)
   status                           | NVARCHAR(20)           | NOT NULL | 
   is_active                        | BIT                    | NOT NULL | Soft active flag
   created_at                       | DATETIME2(0)           | NOT NULL | Record created (UTC)

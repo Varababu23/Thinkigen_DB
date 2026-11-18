@@ -217,5 +217,21 @@ Dedicated mock seed dataset for Teacher Daily Attendance (`teachers_schema.teach
   - Satisfies all 7 CHECK constraints, 6 Foreign Keys, and the unique constraint `UQ_teacher_attendance_teacher_date`.
   - Zero invalid `datetime2` arithmetic operators (uses standard `CONCAT` and `TIMEFROMPARTS`).
 
+## 022_extended_attendance_leaves_grievances_mock_data.sql
+
+Dedicated mock extension seed script continuing operational school records up to **18 November 2026** across Grievances, Leaves, and Attendance for both teachers and students:
+- **Scope & Non-Destructive Ingestion**:
+  - Strictly preserves 100% of existing mock data (0 rows modified, deleted, or replaced).
+  - Uses atomic transactions and `MERGE` / `NOT EXISTS` guards against candidate unique keys to add only missing data up to 18-11-2026.
+- **Teacher & Student Grievances**:
+  - **Teachers**: 10 realistic grievance tickets (`teachers_schema.teacher_grievance`) across all 6 approved categories and 4 priorities with incident dates from 2026-11-02 to 2026-11-18, mapped to Central Campus (`branch_id = 1`) and North Campus (`branch_id = 2`), accompanied by exact 1:1 lifecycle tracking history in `teachers_schema.teacher_grievance_status_history`.
+  - **Students**: 12 realistic student grievances (`student_schema.grievance`) covering academic, transport, hostel, bullying, and facility domains with incident dates from 2026-10-28 to 2026-11-18, accompanied by exact 1:1 lifecycle tracking history in `student_schema.grievance_history`.
+- **Teacher & Student Leaves**:
+  - **Teachers**: 14 realistic leave applications (`teachers_schema.teacher_leave_application`) across `SICK`, `CASUAL`, `PRIVILEGE`, `ON_DUTY`, and `COMPENSATORY` leave types between 2026-11-02 and 2026-11-18. Satisfies `HALF_DAY` (0.5 days) and `FULL_DAY` duration rules, zero active overlap, exact 1:1 status history (`teachers_schema.teacher_leave_status_history`), and automatic balance deduction in `teachers_schema.teacher_leave_allowance`.
+  - **Students**: 16 realistic student leave applications (`student_schema.student_leave`) across `SICK`, `PERSONAL`, `EDUCATIONAL`, and `HEALTH` types adhering strictly to `CK_student_leave_apply_before_leave_day` (`start_date > CAST(applied_at AS DATE)`), complete with 1:1 status history in `student_schema.student_leave_status_history`.
+- **Teacher & Student Attendance**:
+  - **Teachers**: Complete daily attendance (`teachers_schema.teacher_attendance`) for all 80 active teachers across both campuses spanning every calendar day from 2026-11-01 to 2026-11-18 (Sundays as `WEEKLY_OFF`, approved full-day leaves as `ON_LEAVE`, approved half-day leaves as `HALF_DAY`, realistic presence, worked minutes, and check-in/out timestamps).
+  - **Students**: Daily instructional attendance (`student_schema.student_attendance`) for active students from 2026-11-02 to 2026-11-18 across core periods, correlating approved student leaves to excused absences and maintaining student-period-date uniqueness.
+
 **Production:** Do not run dev/mock seeds. Use a controlled provisioning process and bcrypt/argon2 password hashes only.
 

@@ -2426,7 +2426,8 @@ BEGIN TRY
     -- 5C. Schedules for Mid Term Assessment 2026 (Schedules 1..240)
     INSERT INTO management_schema.exam_schedule
       (exam_schedule_id,exam_id,school_id,branch_id,academic_year_id,class_id,section_id,
-       subject_id,teacher_id,exam_date,start_time,end_time,max_marks,pass_marks,status,is_active,created_by)
+       subject_id,teacher_id,exam_date,start_time,end_time,max_marks,pass_marks,
+       evaluation_start_date,evaluation_end_date,status,is_active,created_by)
     SELECT
       ROW_NUMBER() OVER (ORDER BY e.exam_id, s.subject_id),
       e.exam_id,1,e.branch_id,1,e.class_id,e.section_id,
@@ -2437,6 +2438,8 @@ BEGIN TRY
       '11:00',
       100,
       40,
+      DATEADD(DAY, s.subject_id, '2026-08-10'),
+      DATEADD(DAY, s.subject_id + 5, '2026-08-10'),
       N'COMPLETED',
       0,
       1
@@ -2451,7 +2454,8 @@ BEGIN TRY
     -- 5D. Schedules for Upcoming Periodic Assessment 2 - 2026 (Schedules 241..360, starting tomorrow 2026-10-08)
     INSERT INTO management_schema.exam_schedule
       (exam_schedule_id,exam_id,school_id,branch_id,academic_year_id,class_id,section_id,
-       subject_id,teacher_id,exam_date,start_time,end_time,max_marks,pass_marks,status,is_active,created_by)
+       subject_id,teacher_id,exam_date,start_time,end_time,max_marks,pass_marks,
+       evaluation_start_date,evaluation_end_date,status,is_active,created_by)
     SELECT
       240 + ROW_NUMBER() OVER (ORDER BY e.exam_id, s.subject_id),
       e.exam_id,1,1,1,e.class_id,e.section_id,
@@ -2469,6 +2473,22 @@ BEGIN TRY
       '11:30',
       50.00,
       20.00,
+      CASE s.subject_id
+          WHEN 1 THEN '2026-10-09'
+          WHEN 2 THEN '2026-10-10'
+          WHEN 3 THEN '2026-10-12'
+          WHEN 4 THEN '2026-10-13'
+          WHEN 5 THEN '2026-10-14'
+          WHEN 6 THEN '2026-10-15'
+      END,
+      CASE s.subject_id
+          WHEN 1 THEN '2026-10-15'
+          WHEN 2 THEN '2026-10-16'
+          WHEN 3 THEN '2026-10-17'
+          WHEN 4 THEN '2026-10-19'
+          WHEN 5 THEN '2026-10-20'
+          WHEN 6 THEN '2026-10-21'
+      END,
       N'SCHEDULED',
       1,
       1

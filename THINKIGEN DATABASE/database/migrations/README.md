@@ -25,6 +25,11 @@
 | `021_student_exam_performance.sql` | Student Performance | student_exam_performance (backend-calculated summary metrics) |
 | `022_personal_development.sql` | Personal Development | student_personality_development, student_personality_development_review |
 | `023_cultural_participation.sql` | Cultural Participation | student_cultural_participation |
+| `024_teacher_designation.sql` | Teachers | teacher_designation |
+| `025_sports_and_grievance_department.sql` | Sports & Grievance | grievance_department, student_sport_history |
+| `026_teacher_leave_and_grievance.sql` | Teacher Leave & Grievance | teacher_leave, teacher_grievance |
+| `027_teacher_attendance.sql` | Teacher Attendance | teacher_attendance, teacher_punch_log |
+| `028_exam_schedule_evaluation_dates.sql` | Exams (management) | exam_schedule (evaluation_start_date, evaluation_end_date) |
 
 ## Run (local)
 

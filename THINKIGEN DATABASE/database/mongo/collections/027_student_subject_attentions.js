@@ -31,8 +31,8 @@ var validator = {
             "class_name",
             "section_id",
             "section_name",
+            "total_attentions_raised",
             "total_active_attentions",
-            "critical_attentions_count",
             "subjects",
             "last_evaluated_at",
             "is_active",
@@ -53,8 +53,8 @@ var validator = {
             class_name: { bsonType: "string", minLength: 1, maxLength: 50 },
             section_id: { bsonType: "int", minimum: 1 },
             section_name: { bsonType: "string", minLength: 1, maxLength: 20 },
+            total_attentions_raised: { bsonType: "int", minimum: 0 },
             total_active_attentions: { bsonType: "int", minimum: 0 },
-            critical_attentions_count: { bsonType: "int", minimum: 0 },
 
             // Subjects array containing subject-specific attentions
             subjects: {
@@ -65,6 +65,7 @@ var validator = {
                         "subject_id",
                         "subject_name",
                         "subject_code",
+                        "total_attentions_raised",
                         "active_attentions_count",
                         "attentions"
                     ],
@@ -75,6 +76,7 @@ var validator = {
                         subject_code: { bsonType: "string", minLength: 1, maxLength: 30 },
                         assigned_teacher_id: { bsonType: ["int", "null"] },
                         assigned_teacher_name: { bsonType: ["string", "null"], maxLength: 150 },
+                        total_attentions_raised: { bsonType: "int", minimum: 0 },
                         active_attentions_count: { bsonType: "int", minimum: 0 },
 
                         // List of attention items for this subject
@@ -85,7 +87,6 @@ var validator = {
                                 required: [
                                     "attention_id",
                                     "attention_type",
-                                    "severity",
                                     "title",
                                     "description",
                                     "trigger_source",
@@ -103,10 +104,6 @@ var validator = {
                                             "PENDING_HOMEWORK",
                                             "ABSENT_ATTENDANCE"
                                         ]
-                                    },
-                                    severity: {
-                                        bsonType: "string",
-                                        enum: ["CRITICAL", "HIGH", "MEDIUM", "LOW"]
                                     },
                                     title: { bsonType: "string", minLength: 1, maxLength: 200 },
                                     description: { bsonType: "string", minLength: 1, maxLength: 500 },
@@ -257,11 +254,17 @@ if (!targetDb.getCollectionNames().includes(COLLECTION_NAME)) {
             doc.class_id = NumberInt(doc.class_id);
             doc.section_id = NumberInt(doc.section_id);
             doc.total_active_attentions = NumberInt(doc.total_active_attentions);
-            doc.critical_attentions_count = NumberInt(doc.critical_attentions_count);
+            delete doc.critical_attentions_count;
+            doc.total_attentions_raised = NumberInt(doc.total_attentions_raised != null ? doc.total_attentions_raised : docTotalRaised);
             doc.is_active = NumberInt(doc.is_active || 1);
 
+            var docTotalRaised = 0;
             if (Array.isArray(doc.subjects)) {
                 doc.subjects.forEach(function (subj) {
+                    var subjRaised = Array.isArray(subj.attentions) ? subj.attentions.length : 0;
+                    subj.total_attentions_raised = NumberInt(subj.total_attentions_raised != null ? subj.total_attentions_raised : subjRaised);
+                    docTotalRaised += subjRaised;
+
                     subj.subject_id = NumberInt(subj.subject_id);
                     if (subj.assigned_teacher_id != null) {
                         subj.assigned_teacher_id = NumberInt(subj.assigned_teacher_id);
@@ -349,10 +352,10 @@ var indexes = [
         key: { "subjects.assigned_teacher_id": 1, academic_year_id: 1, "subjects.active_attentions_count": 1 },
         options: { name: "ix_student_attentions_teacher" }
     },
-    // 4. Status, Type, and Severity Alert Triage Index:
+    // 4. Status and Type Alert Triage Index:
     // Anchored with academic_year_id to avoid whole-collection multikey index scans
     {
-        key: { academic_year_id: 1, "subjects.attentions.status": 1, "subjects.attentions.attention_type": 1, "subjects.attentions.severity": 1 },
+        key: { academic_year_id: 1, "subjects.attentions.status": 1, "subjects.attentions.attention_type": 1 },
         options: { name: "ix_student_attentions_status_type" }
     },
     // 5. Class Teacher Section Priority Index:

@@ -46,8 +46,8 @@
         class_name: "Class 10",
         section_id: NumberInt(101),
         section_name: "Section A",
+        total_attentions_raised: 3,
         total_active_attentions: 3,
-        critical_attentions_count: 1,
         subjects: [
             {
                 subject_id: NumberInt(1),
@@ -55,6 +55,7 @@
                 subject_code: "MAT-10",
                 assigned_teacher_id: NumberInt(501),
                 assigned_teacher_name: "Rajesh Sharma",
+                total_attentions_raised: 2,
                 active_attentions_count: 2,
                 attentions: [
                     {
@@ -127,6 +128,7 @@
                 subject_code: "SCI-10",
                 assigned_teacher_id: NumberInt(502),
                 assigned_teacher_name: "Ananya Sen",
+                total_attentions_raised: 1,
                 active_attentions_count: 1,
                 attentions: [
                     {
@@ -425,6 +427,9 @@
                                 $mergeObjects: [
                                     "$$sub",
                                     {
+                                        total_attentions_raised: {
+                                            $size: "$$sub.attentions"
+                                        },
                                         active_attentions_count: {
                                             $size: {
                                                 $filter: {
@@ -443,36 +448,18 @@
             },
             {
                 $set: {
+                    total_attentions_raised: {
+                        $reduce: {
+                            input: "$subjects",
+                            initialValue: 0,
+                            in: { $add: ["$$value", "$$this.total_attentions_raised"] }
+                        }
+                    },
                     total_active_attentions: {
                         $reduce: {
                             input: "$subjects",
                             initialValue: 0,
                             in: { $add: ["$$value", "$$this.active_attentions_count"] }
-                        }
-                    },
-                    critical_attentions_count: {
-                        $reduce: {
-                            input: "$subjects",
-                            initialValue: 0,
-                            in: {
-                                $add: [
-                                    "$$value",
-                                    {
-                                        $size: {
-                                            $filter: {
-                                                input: "$$this.attentions",
-                                                as: "att",
-                                                cond: {
-                                                    $and: [
-                                                        { $eq: ["$$att.status", "ACTIVE"] },
-                                                        { $eq: ["$$att.severity", "CRITICAL"] }
-                                                    ]
-                                                }
-                                            }
-                                        }
-                                    }
-                                ]
-                            }
                         }
                     },
                     updated_at: new Date()
@@ -483,11 +470,13 @@
     assert(countRecalcRes.modifiedCount === 1, "Atomic aggregation update successfully recalculated counts.");
 
     var recalculatedDoc = db[COLLECTION_NAME].findOne({ student_id: NumberInt(99901) });
+    assert(recalculatedDoc.total_attentions_raised === 3, "total_attentions_raised remains 3 even after statuses change to RESOLVED/EXCUSED.");
     assert(recalculatedDoc.total_active_attentions === 1, "total_active_attentions accurately updated to 1.");
-    assert(recalculatedDoc.critical_attentions_count === 1, "critical_attentions_count accurately updated to 1.");
     
     var mathSub = recalculatedDoc.subjects.find(function(s) { return s.subject_id.toString() === "1"; });
     var sciSub = recalculatedDoc.subjects.find(function(s) { return s.subject_id.toString() === "2"; });
+    assert(mathSub.total_attentions_raised === 2, "Math total_attentions_raised is 2.");
+    assert(sciSub.total_attentions_raised === 1, "Science total_attentions_raised is 1.");
     assert(mathSub.active_attentions_count === 1, "Math active_attentions_count is exactly 1.");
     assert(sciSub.active_attentions_count === 0, "Science active_attentions_count is exactly 0.");
 
@@ -584,14 +573,12 @@
                 students_with_attentions: {
                     $sum: { $cond: [{ $gt: ["$total_active_attentions", 0] }, 1, 0] }
                 },
-                total_active_alerts: { $sum: "$total_active_attentions" },
-                total_critical_alerts: { $sum: "$critical_attentions_count" }
+                total_active_alerts: { $sum: "$total_active_attentions" }
             }
         }
     ]).toArray();
     assert(mgmtSummary.length === 1, "Management summary aggregation executed successfully.");
     assert(mgmtSummary[0].total_active_alerts === 1, "Management summary reflects exactly 1 total active alert.");
-    assert(mgmtSummary[0].total_critical_alerts === 1, "Management summary reflects exactly 1 total critical alert.");
 
     // -------------------------------------------------------------------------
     // CLEANUP

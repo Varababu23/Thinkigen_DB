@@ -1,4 +1,4 @@
-﻿/*
+/*
     THINKIGEN ERP - Full SQL Server Schema
     Paste this entire file into SSMS and execute it as one query.
 
@@ -748,6 +748,8 @@ BEGIN
         end_time           TIME(0)         NOT NULL,
         max_marks          DECIMAL(6, 2)   NOT NULL,
         pass_marks         DECIMAL(6, 2)   NULL,
+        evaluation_start_date DATE         NULL,
+        evaluation_end_date   DATE         NULL,
         status             NVARCHAR(20)    NOT NULL,
         is_active          BIT             NOT NULL CONSTRAINT DF_exam_schedule_is_active DEFAULT (1),
         created_at         DATETIME2(0)    NOT NULL CONSTRAINT DF_exam_schedule_created_at DEFAULT (SYSUTCDATETIME()),
@@ -763,6 +765,10 @@ BEGIN
             (pass_marks IS NULL OR (pass_marks >= 0 AND pass_marks <= max_marks)),
         CONSTRAINT CK_exam_schedule_status CHECK
             (status IN (N'SCHEDULED', N'COMPLETED', N'CANCELLED')),
+        CONSTRAINT CK_exam_schedule_evaluation_dates CHECK
+            (evaluation_end_date IS NULL OR evaluation_start_date IS NULL OR evaluation_end_date >= evaluation_start_date),
+        CONSTRAINT CK_exam_schedule_evaluation_start_date CHECK
+            (evaluation_start_date IS NULL OR evaluation_start_date >= exam_date),
         CONSTRAINT FK_exam_schedule_exam FOREIGN KEY (exam_id) REFERENCES management_schema.exam (exam_id),
         CONSTRAINT FK_exam_schedule_school FOREIGN KEY (school_id) REFERENCES management_schema.school (school_id),
         CONSTRAINT FK_exam_schedule_branch FOREIGN KEY (branch_id) REFERENCES management_schema.branch (branch_id),
@@ -810,6 +816,18 @@ IF NOT EXISTS (
 BEGIN
     CREATE NONCLUSTERED INDEX IX_exam_schedule_exam_date
         ON management_schema.exam_schedule (exam_id, exam_date, start_time)
+        WHERE is_active = 1;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT 1 FROM sys.indexes
+    WHERE name = N'IX_exam_schedule_teacher_evaluation'
+      AND object_id = OBJECT_ID(N'management_schema.exam_schedule')
+)
+BEGIN
+    CREATE NONCLUSTERED INDEX IX_exam_schedule_teacher_evaluation
+        ON management_schema.exam_schedule (teacher_id, evaluation_end_date, evaluation_start_date)
         WHERE is_active = 1;
 END;
 GO

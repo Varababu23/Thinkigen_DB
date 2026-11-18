@@ -161,8 +161,8 @@ PURPOSE:
                 "class_name",
                 "section_id",
                 "section_name",
+                "total_attentions_raised",
                 "total_active_attentions",
-                "critical_attentions_count",
                 "subjects",
                 "last_evaluated_at",
                 "is_active",
@@ -183,13 +183,13 @@ PURPOSE:
                 class_name: { bsonType: "string" },
                 section_id: { bsonType: "int", description: "Section ID (must be int)" },
                 section_name: { bsonType: "string" },
+                total_attentions_raised: { bsonType: "int" },
                 total_active_attentions: { bsonType: "int" },
-                critical_attentions_count: { bsonType: "int" },
                 subjects: {
                     bsonType: "array",
                     items: {
                         bsonType: "object",
-                        required: ["subject_id", "subject_name", "subject_code", "active_attentions_count", "attentions"],
+                        required: ["subject_id", "subject_name", "subject_code", "total_attentions_raised", "active_attentions_count", "attentions"],
                         additionalProperties: true,
                         properties: {
                             subject_id: { bsonType: "int" },
@@ -197,17 +197,17 @@ PURPOSE:
                             subject_code: { bsonType: "string" },
                             assigned_teacher_id: { bsonType: ["int", "null"] },
                             assigned_teacher_name: { bsonType: ["string", "null"] },
+                            total_attentions_raised: { bsonType: "int" },
                             active_attentions_count: { bsonType: "int" },
                             attentions: {
                                 bsonType: "array",
                                 items: {
                                     bsonType: "object",
-                                    required: ["attention_id", "attention_type", "severity", "title", "description", "trigger_source", "source_id", "triggered_at", "status"],
+                                    required: ["attention_id", "attention_type", "title", "description", "trigger_source", "source_id", "triggered_at", "status"],
                                     additionalProperties: true,
                                     properties: {
                                         attention_id: { bsonType: "string" },
                                         attention_type: { bsonType: "string" },
-                                        severity: { bsonType: "string" },
                                         title: { bsonType: "string" },
                                         description: { bsonType: "string" },
                                         trigger_source: { bsonType: "string" },
@@ -328,7 +328,7 @@ PURPOSE:
         { key: { student_id: 1, academic_year_id: 1 }, options: { unique: true, name: "uq_student_subject_attentions_year" } },
         { key: { school_id: 1, branch_id: 1, academic_year_id: 1, class_id: 1, section_id: 1 }, options: { name: "ix_student_attentions_scope" } },
         { key: { "subjects.assigned_teacher_id": 1, academic_year_id: 1, "subjects.active_attentions_count": 1 }, options: { name: "ix_student_attentions_teacher" } },
-        { key: { academic_year_id: 1, "subjects.attentions.status": 1, "subjects.attentions.attention_type": 1, "subjects.attentions.severity": 1 }, options: { name: "ix_student_attentions_status_type" } },
+        { key: { academic_year_id: 1, "subjects.attentions.status": 1, "subjects.attentions.attention_type": 1 }, options: { name: "ix_student_attentions_status_type" } },
         { key: { section_id: 1, academic_year_id: 1, total_active_attentions: -1 }, options: { name: "ix_student_attentions_section_total" } }
     ];
     attIndexes.forEach(function (idx) { safeReconcileIndex(targetDb[COLL_ATTENTIONS], idx.key, idx.options); });
@@ -494,8 +494,8 @@ PURPOSE:
             class_name: "Class 8 - Central",
             section_id: NumberInt(1),
             section_name: "A",
+            total_attentions_raised: NumberInt(1),
             total_active_attentions: NumberInt(1),
-            critical_attentions_count: NumberInt(1),
             subjects: [
                 {
                     subject_id: NumberInt(1),
@@ -503,6 +503,7 @@ PURPOSE:
                     subject_code: "ENG",
                     assigned_teacher_id: NumberInt(1),
                     assigned_teacher_name: "Keshav Kulkarni",
+                    total_attentions_raised: NumberInt(0),
                     active_attentions_count: NumberInt(0),
                     attentions: [],
                     subject_summary: {
@@ -519,12 +520,12 @@ PURPOSE:
                     subject_code: "MAT",
                     assigned_teacher_id: NumberInt(8),
                     assigned_teacher_name: "Zara Pai",
+                    total_attentions_raised: NumberInt(1),
                     active_attentions_count: NumberInt(1),
                     attentions: [
                         {
                             attention_id: "ATT-1-ASM-501-2026",
                             attention_type: "LOW_ASSESSMENT_SCORE",
-                            severity: "CRITICAL",
                             title: "Algebra Slip Test Below Passing Benchmark",
                             description: "Scored 14 out of 50 in Mid-Term Linear Equations Test.",
                             trigger_source: "ASSESSMENT",

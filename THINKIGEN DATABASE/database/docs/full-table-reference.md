@@ -763,6 +763,8 @@ Related: [mongodb-collections-reference.md](./mongodb-collections-reference.md) 
 | `end_time` | `TIME(0)` | NOT NULL |  |
 | `max_marks` | `DECIMAL(6, 2)` | NOT NULL |  |
 | `pass_marks` | `DECIMAL(6, 2)` | NULL |  |
+| `evaluation_start_date` | `DATE` | NULL | Paper evaluation start date by teachers (>= exam_date) |
+| `evaluation_end_date` | `DATE` | NULL | Deadline for paper evaluation (>= evaluation_start_date) |
 | `status` | `NVARCHAR(20)` | NOT NULL |  |
 | `is_active` | `BIT` | NOT NULL | Soft active flag |
 | `created_at` | `DATETIME2(0)` | NOT NULL | Record created (UTC) |
@@ -779,6 +781,8 @@ Related: [mongodb-collections-reference.md](./mongodb-collections-reference.md) 
 - `CONSTRAINT CK_exam_schedule_max_marks CHECK (max_marks > 0)`
 - `CONSTRAINT CK_exam_schedule_pass_marks CHECK`
 - `CONSTRAINT CK_exam_schedule_status CHECK`
+- `CONSTRAINT CK_exam_schedule_evaluation_dates CHECK (evaluation_end_date IS NULL OR evaluation_start_date IS NULL OR evaluation_end_date >= evaluation_start_date)`
+- `CONSTRAINT CK_exam_schedule_evaluation_start_date CHECK (evaluation_start_date IS NULL OR evaluation_start_date >= exam_date)`
 - `CONSTRAINT FK_exam_schedule_exam FOREIGN KEY (exam_id) REFERENCES management_schema.exam (exam_id)`
 - `CONSTRAINT FK_exam_schedule_school FOREIGN KEY (school_id) REFERENCES management_schema.school (school_id)`
 - `CONSTRAINT FK_exam_schedule_branch FOREIGN KEY (branch_id) REFERENCES management_schema.branch (branch_id)`
@@ -795,6 +799,7 @@ Related: [mongodb-collections-reference.md](./mongodb-collections-reference.md) 
 - `IX_exam_schedule_academic_scope`
 - `IX_exam_schedule_teacher_date`
 - `IX_exam_schedule_exam_date`
+- `IX_exam_schedule_teacher_evaluation`
 
 ### `management_schema.grievance_department`
 

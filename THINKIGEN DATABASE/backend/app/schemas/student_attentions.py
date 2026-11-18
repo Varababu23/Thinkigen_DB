@@ -100,7 +100,6 @@ class AttentionItemBase(BaseModel):
 
     attention_id: str = Field(..., min_length=1, max_length=64, description="Deterministic stable attention ID")
     attention_type: AttentionType
-    severity: AttentionSeverity
     title: str = Field(..., min_length=1, max_length=200)
     description: str = Field(..., min_length=1, max_length=500)
     trigger_source: TriggerSource
@@ -200,6 +199,7 @@ class SubjectAttentionItem(BaseModel):
     subject_code: str = Field(..., min_length=1, max_length=30)
     assigned_teacher_id: Optional[int] = Field(None, ge=1)
     assigned_teacher_name: Optional[str] = Field(None, max_length=150)
+    total_attentions_raised: int = Field(default=0, ge=0, description="Total attentions raised in this subject")
     active_attentions_count: int = Field(default=0, ge=0)
     attentions: List[AttentionItemBase] = Field(default_factory=list)
     subject_summary: Optional[SubjectSummary] = None
@@ -220,8 +220,8 @@ class StudentSubjectAttentionDocument(BaseModel):
     class_name: str = Field(..., min_length=1, max_length=50)
     section_id: int = Field(..., ge=1)
     section_name: str = Field(..., min_length=1, max_length=20)
+    total_attentions_raised: int = Field(default=0, ge=0, description="Total cumulative attentions raised for student across all subjects")
     total_active_attentions: int = Field(default=0, ge=0)
-    critical_attentions_count: int = Field(default=0, ge=0)
     subjects: List[SubjectAttentionItem] = Field(default_factory=list)
     last_evaluated_at: datetime
     is_active: int = Field(default=1)
@@ -231,24 +231,24 @@ class StudentSubjectAttentionDocument(BaseModel):
     def recalculate_counts(self) -> None:
         """
         Recalculates counts according to strict specification:
+        - total_attentions_raised = total count of all attention records across all subjects
         - total_active_attentions = count of attention records with status == ACTIVE across all subjects
-        - critical_attentions_count = count of ACTIVE attention records with severity == CRITICAL
-        - active_attentions_count = count of ACTIVE attention records within each subject
+        - for each subject:
+            - total_attentions_raised = count of all attention records in that subject
+            - active_attentions_count = count of ACTIVE attention records in that subject
         """
+        tot_raised = 0
         tot_active = 0
-        crit_active = 0
         for sub in self.subjects:
-            sub_active = 0
-            for att in sub.attentions:
-                if att.status == AttentionStatus.ACTIVE:
-                    sub_active += 1
-                    tot_active += 1
-                    if att.severity == AttentionSeverity.CRITICAL:
-                        crit_active += 1
+            sub_raised = len(sub.attentions)
+            sub_active = sum(1 for att in sub.attentions if att.status == AttentionStatus.ACTIVE)
+            sub.total_attentions_raised = sub_raised
             sub.active_attentions_count = sub_active
+            tot_raised += sub_raised
+            tot_active += sub_active
 
+        self.total_attentions_raised = tot_raised
         self.total_active_attentions = tot_active
-        self.critical_attentions_count = crit_active
 
 
 # -----------------------------------------------------------------------------
