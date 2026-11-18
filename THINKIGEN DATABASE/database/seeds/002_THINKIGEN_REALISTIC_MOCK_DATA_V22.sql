@@ -1,11 +1,12 @@
 /*
 ================================================================================
-THINKIGEN ERP - REALISTIC MOCK / TEST DATA SEED - V23 (STANDARDIZED)
+THINKIGEN ERP - REALISTIC MOCK / TEST DATA SEED - V24 (MASTER DATASET - 54 TABLES)
 Target: SQL Server / SSMS
 Academic Year: 2026-2027
 Generated: Authentic Single School, 2 Branches, Classes 1-10, Sections A & B,
            10 Students Per Section (400 Active Students), Management Staff,
-           Teachers, and 10th Class Passed-Out Alumni Students.
+           80 Teachers with Complete Timetable, Attendance (Migration 027),
+           Leaves (Migration 026), Grievances, and 10th Class Passed-Out Alumni.
 
 MOCK USER EMAIL STANDARDS ENFORCED:
 - Student:     stu_XXXX@schoolname.edu   (e.g., stu_1201@schoolname.edu)
@@ -42,6 +43,12 @@ BEGIN TRY SET IDENTITY_INSERT management_schema.class_subject OFF; END TRY BEGIN
 BEGIN TRY SET IDENTITY_INSERT teachers_schema.teacher OFF; END TRY BEGIN CATCH END CATCH;
 BEGIN TRY SET IDENTITY_INSERT teachers_schema.teacher_subject_assignment OFF; END TRY BEGIN CATCH END CATCH;
 BEGIN TRY SET IDENTITY_INSERT teachers_schema.section_class_teacher_assignment OFF; END TRY BEGIN CATCH END CATCH;
+BEGIN TRY SET IDENTITY_INSERT teachers_schema.teacher_leave_allowance OFF; END TRY BEGIN CATCH END CATCH;
+BEGIN TRY SET IDENTITY_INSERT teachers_schema.teacher_leave_application OFF; END TRY BEGIN CATCH END CATCH;
+BEGIN TRY SET IDENTITY_INSERT teachers_schema.teacher_leave_status_history OFF; END TRY BEGIN CATCH END CATCH;
+BEGIN TRY SET IDENTITY_INSERT teachers_schema.teacher_attendance OFF; END TRY BEGIN CATCH END CATCH;
+BEGIN TRY SET IDENTITY_INSERT teachers_schema.teacher_grievance OFF; END TRY BEGIN CATCH END CATCH;
+BEGIN TRY SET IDENTITY_INSERT teachers_schema.teacher_grievance_status_history OFF; END TRY BEGIN CATCH END CATCH;
 BEGIN TRY SET IDENTITY_INSERT student_schema.student OFF; END TRY BEGIN CATCH END CATCH;
 BEGIN TRY SET IDENTITY_INSERT student_schema.student_guardian OFF; END TRY BEGIN CATCH END CATCH;
 BEGIN TRY SET IDENTITY_INSERT management_schema.exam OFF; END TRY BEGIN CATCH END CATCH;
@@ -83,6 +90,9 @@ BEGIN TRY SET IDENTITY_INSERT student_schema.student_personality_development OFF
 BEGIN TRY SET IDENTITY_INSERT student_schema.student_personality_development_review OFF; END TRY BEGIN CATCH END CATCH;
 BEGIN TRY SET IDENTITY_INSERT student_schema.student_cultural_participation OFF; END TRY BEGIN CATCH END CATCH;
 BEGIN TRY SET IDENTITY_INSERT sports_schema.student_sport_history OFF; END TRY BEGIN CATCH END CATCH;
+BEGIN TRY SET IDENTITY_INSERT transport_schema.transport_incident OFF; END TRY BEGIN CATCH END CATCH;
+BEGIN TRY SET IDENTITY_INSERT transport_schema.transport_incident_history OFF; END TRY BEGIN CATCH END CATCH;
+BEGIN TRY SET IDENTITY_INSERT transport_schema.trip_passenger_attendance OFF; END TRY BEGIN CATCH END CATCH;
 
 BEGIN TRY
     BEGIN TRANSACTION;
@@ -153,7 +163,7 @@ BEGIN TRY
     SET @sql=N'';
     SELECT @sql=@sql + N'DBCC CHECKIDENT (' + QUOTENAME(s.name+N'.'+t.name, '''') + N', RESEED, 0) WITH NO_INFOMSGS;'+CHAR(13)+CHAR(10)
     FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id JOIN sys.identity_columns ic ON ic.object_id=t.object_id
-    WHERE s.name IN (N'security_schema',N'management_schema',N'student_schema',N'teachers_schema',N'finance_schema',N'library_schema',N'transport_schema',N'alumni_schema');
+    WHERE s.name IN (N'security_schema',N'management_schema',N'student_schema',N'teachers_schema',N'finance_schema',N'library_schema',N'transport_schema',N'alumni_schema',N'sports_schema');
     EXEC sys.sp_executesql @sql;
 
     /* ============================================================
@@ -2353,8 +2363,8 @@ BEGIN TRY
        Includes completed Mid Term Assessment (Aug 2026) and upcoming
        Periodic Assessment 2 (starting Oct 8, 2026) for School 1, Branch 1.
        ============================================================ */
-    /* Re-verify @TimetableMonday for Section 9 periods grid */
-    SET @TimetableMonday = CAST(
+    /* Compute @TimetableMonday for Section 5 exams, Section 6 assessments, and Section 9 timetable */
+    DECLARE @TimetableMonday DATE = CAST(
         DATEADD(DAY,
             CASE DATEPART(WEEKDAY, GETDATE())
                 WHEN 1 THEN -6  -- Sunday  -> prev Monday
@@ -2527,7 +2537,7 @@ BEGIN TRY
         WHEN 0 THEN N'SLIP_TEST'
         WHEN 1 THEN N'QUIZ'
         ELSE N'PROJECT_WORK' END,
-      DATEADD(DAY, 3, @TimetableMonday),  -- Thursday of Week 1 (Guaranteed active timetable date)
+      DATEADD(DAY, -4, @TimetableMonday),  -- Thursday of previous week (Guaranteed completed assessment date)
       CASE (sec.section_id + s.subject_id) % 3 WHEN 2 THEN 50.00 ELSE 25.00 END,
       1,1
     FROM management_schema.section sec
@@ -2560,7 +2570,7 @@ BEGIN TRY
     JOIN teachers_schema.teacher t ON t.teacher_id = a.teacher_id
     JOIN student_schema.student st
       ON st.section_id = a.section_id AND st.student_status = N'ACTIVE'
-    WHERE a.assessment_date <= DATEADD(DAY, -1, CAST(GETUTCDATE() AS DATE));
+    WHERE a.is_active = 1;
     SET IDENTITY_INSERT student_schema.assessment_result OFF;
 
     /* ============================================================
@@ -2706,8 +2716,7 @@ BEGIN TRY
     JOIN management_schema.school_class c ON c.class_id = sec.class_id;
     SET IDENTITY_INSERT management_schema.timetable OFF;
 
-    /* Compute the Monday of the current week (ISO Mon=2 in SQL Server DATEFIRST=7 default) */
-    DECLARE @TimetableMonday DATE;
+    /* Re-verify @TimetableMonday for timetable periods grid */
     SET @TimetableMonday = CAST(
         DATEADD(DAY,
             CASE DATEPART(WEEKDAY, GETDATE())
@@ -3101,8 +3110,7 @@ BEGIN TRY
      AND st.student_status = N'ACTIVE'
     WHERE h.branch_id = 1
       AND h.class_id = 1
-      AND h.section_id = 1
-      AND CAST(h.assigned_at AS DATE) <= DATEADD(DAY, -1, CAST(GETUTCDATE() AS DATE));
+      AND h.section_id = 1;
     SET IDENTITY_INSERT student_schema.homework_status OFF;
 
     /* ============================================================
@@ -3183,6 +3191,348 @@ BEGIN TRY
       (5,1,1,1,N'FESTIVAL',N'Diwali Festival',N'Deepavali holidays.','2026-11-08','2026-11-10',1,1),
       (6,1,2,1,N'FESTIVAL',N'Diwali Festival',N'Deepavali holidays.','2026-11-08','2026-11-10',1,1);
     SET IDENTITY_INSERT management_schema.holiday OFF;
+
+    /* ============================================================
+       11B. TEACHER LEAVE MANAGEMENT (ALLOWANCES, APPLICATIONS & STATUS HISTORY)
+       Academic Year: 2026-2027 (academic_year_id = 1)
+       Rule 1: 12.0 total days per leave category for each active teacher
+       Rule 2: 20 realistic applications derived from timetable instructional days
+       Rule 3: Exact 1:1 status history transition tracking
+       Rule 4: Synchronized used days; remaining days persisted automatically
+       ============================================================ */
+
+    /* 1. Seed Teacher Leave Allowances (All 80 active teachers, 12.0 days quota per category) */
+    INSERT INTO teachers_schema.teacher_leave_allowance
+    (
+        school_id, branch_id, academic_year_id, teacher_id,
+        sick_total_days, sick_used_days,
+        casual_total_days, casual_used_days,
+        privilege_total_days, privilege_used_days,
+        on_duty_total_days, on_duty_used_days,
+        compensatory_total_days, compensatory_used_days,
+        is_active, created_at, created_by, updated_at, updated_by
+    )
+    SELECT
+        t.school_id,
+        t.branch_id,
+        1 AS academic_year_id,
+        t.teacher_id,
+        12.0 AS sick_total_days,
+        0.0  AS sick_used_days,
+        12.0 AS casual_total_days,
+        0.0  AS casual_used_days,
+        12.0 AS privilege_total_days,
+        0.0  AS privilege_used_days,
+        12.0 AS on_duty_total_days,
+        0.0  AS on_duty_used_days,
+        12.0 AS compensatory_total_days,
+        0.0  AS compensatory_used_days,
+        1    AS is_active,
+        CAST('2026-04-01 08:00:00' AS DATETIME2(0)) AS created_at,
+        1    AS created_by,
+        CAST('2026-10-31 08:00:00' AS DATETIME2(0)) AS updated_at,
+        1    AS updated_by
+    FROM teachers_schema.teacher t
+    WHERE t.is_active = 1
+    ORDER BY t.teacher_id;
+
+    /* 2. Seed Teacher Leave Applications (20 Realistic Records) */
+    SET IDENTITY_INSERT teachers_schema.teacher_leave_application ON;
+    INSERT INTO teachers_schema.teacher_leave_application
+    (
+        teacher_leave_application_id,
+        school_id, branch_id, academic_year_id, teacher_id,
+        leave_type, leave_duration_type, start_date, end_date,
+        total_days, reason, status, is_active,
+        created_at, created_by, updated_at, updated_by
+    )
+    VALUES
+    (1, 1, 1, 1, 1, 'CASUAL', 'FULL_DAY', '2026-10-08', '2026-10-08', 1.0, N'Attending family engagement ceremony; Section 1 (Class 1 Sec A) Period 1 English substitution assigned to Teacher 2 Radhika Pillai.', N'APPROVED', 1, CAST('2026-10-06 09:30:00' AS DATETIME2(0)), 101, CAST('2026-10-06 14:15:00' AS DATETIME2(0)), 3),
+    (2, 1, 1, 1, 8, 'ON_DUTY', 'FULL_DAY', '2026-10-15', '2026-10-16', 2.0, N'Deputed for CBSE Regional Mathematics Olympiad Coordination at State Board Center; Section 1 Period 2 Math covered by Teacher 9 Utkarsh Mishra.', N'APPROVED', 1, CAST('2026-10-12 10:00:00' AS DATETIME2(0)), 108, CAST('2026-10-12 16:30:00' AS DATETIME2(0)), 3),
+    (3, 1, 1, 1, 15, 'SICK', 'HALF_DAY', '2026-10-21', '2026-10-21', 0.5, N'Dental appointment and procedure during afternoon session; Section 1 morning Period 4 Science laboratory in Room-01 conducted as scheduled.', N'APPROVED', 1, CAST('2026-10-20 08:30:00' AS DATETIME2(0)), 115, CAST('2026-10-20 11:00:00' AS DATETIME2(0)), 3),
+    (4, 1, 1, 1, 22, 'SICK', 'FULL_DAY', '2026-10-12', '2026-10-13', 2.0, N'Severe seasonal viral fever and acute throat infection; medical prescription submitted; Section 1 Period 5 Social Science covered by Teacher 23 Kushagra Kapoor.', N'APPROVED', 1, CAST('2026-10-11 18:00:00' AS DATETIME2(0)), 122, CAST('2026-10-12 08:15:00' AS DATETIME2(0)), 3),
+    (5, 1, 1, 1, 29, 'COMPENSATORY', 'FULL_DAY', '2026-10-26', '2026-10-26', 1.0, N'Compensatory off for Sunday duties on 2026-10-18 managing the National Cyber Olympiad online server testing in Computer Lab 1.', N'APPROVED', 1, CAST('2026-10-22 11:00:00' AS DATETIME2(0)), 129, CAST('2026-10-23 15:00:00' AS DATETIME2(0)), 3),
+    (6, 1, 1, 1, 35, 'ON_DUTY', 'FULL_DAY', '2026-10-23', '2026-10-24', 2.0, N'Escorting school football team for Inter-School Zonal Sports Tournament at District Stadium; Section 1 Period 8 PE sports drills supervised by Teacher 36 Jaya Khatri.', N'APPROVED', 1, CAST('2026-10-19 14:00:00' AS DATETIME2(0)), 135, CAST('2026-10-20 09:30:00' AS DATETIME2(0)), 3),
+    (7, 1, 1, 1, 2, 'PRIVILEGE', 'FULL_DAY', '2026-10-27', '2026-10-29', 3.0, N'Availing earned privilege leave for daughter convocation ceremony out of state; Section 2 (Class 1 Sec B) English syllabus covered in advance.', N'APPROVED', 1, CAST('2026-10-15 10:00:00' AS DATETIME2(0)), 102, CAST('2026-10-16 11:30:00' AS DATETIME2(0)), 3),
+    (8, 1, 1, 1, 9, 'CASUAL', 'FULL_DAY', '2026-10-14', '2026-10-14', 1.0, N'Urgent personal banking and property documentation work.', N'REJECTED', 1, CAST('2026-10-13 16:00:00' AS DATETIME2(0)), 109, CAST('2026-10-14 08:00:00' AS DATETIME2(0)), 3),
+    (9, 1, 1, 1, 16, 'CASUAL', 'FULL_DAY', '2026-10-28', '2026-10-28', 1.0, N'Personal appointment at passport seva kendra (appointment subsequently postponed by authority).', N'CANCELLED', 1, CAST('2026-10-25 10:00:00' AS DATETIME2(0)), 116, CAST('2026-10-27 16:00:00' AS DATETIME2(0)), 116),
+    (10, 1, 1, 1, 4, 'SICK', 'FULL_DAY', '2026-10-26', '2026-10-26', 1.0, N'Severe migraine headache and medical checkup; timetable period covered by department colleague.', N'APPROVED', 1, CAST('2026-10-26 07:30:00' AS DATETIME2(0)), 104, CAST('2026-10-26 08:15:00' AS DATETIME2(0)), 3),
+    (11, 1, 1, 1, 11, 'CASUAL', 'HALF_DAY', '2026-10-29', '2026-10-29', 0.5, N'Attending municipal property tax assessment meeting in afternoon session; morning Math class conducted.', N'APPROVED', 1, CAST('2026-10-28 14:00:00' AS DATETIME2(0)), 111, CAST('2026-10-28 17:00:00' AS DATETIME2(0)), 3),
+    (12, 1, 1, 1, 17, 'COMPENSATORY', 'FULL_DAY', '2026-10-30', '2026-10-30', 1.0, N'Compensatory off for supervising Saturday inter-school science exhibition laboratory setup on 2026-10-17.', N'APPROVED', 1, CAST('2026-10-28 11:00:00' AS DATETIME2(0)), 117, CAST('2026-10-29 09:30:00' AS DATETIME2(0)), 3),
+    (13, 1, 1, 1, 23, 'PRIVILEGE', 'FULL_DAY', '2026-10-19', '2026-10-20', 2.0, N'Family pilgrimage travel; Social Science scheduled topics assigned to Section 2 specialist.', N'APPROVED', 1, CAST('2026-10-10 11:00:00' AS DATETIME2(0)), 123, CAST('2026-10-12 14:00:00' AS DATETIME2(0)), 3),
+    (14, 1, 1, 1, 30, 'CASUAL', 'FULL_DAY', '2026-10-30', '2026-10-30', 1.0, N'Attending sister engagement ceremony out of station; Period 7 Computer Lab substitute requested.', N'PENDING', 1, CAST('2026-10-29 16:30:00' AS DATETIME2(0)), 130, CAST('2026-10-29 16:30:00' AS DATETIME2(0)), 130),
+    (15, 1, 2, 1, 41, 'CASUAL', 'FULL_DAY', '2026-10-09', '2026-10-09', 1.0, N'Personal urgent domestic repairs; Section 21 (Class 11 Sec A in Room-21) Period 1 English substitution assigned to Teacher 42 Rekha Madan.', N'APPROVED', 1, CAST('2026-10-07 10:00:00' AS DATETIME2(0)), 141, CAST('2026-10-07 15:00:00' AS DATETIME2(0)), 4),
+    (16, 1, 2, 1, 48, 'SICK', 'FULL_DAY', '2026-10-19', '2026-10-20', 2.0, N'Acute gastroenteritis and dehydration; prescribed 48-hour bed rest; Section 21 Period 2 Math covered by Teacher 49 Rajesh Narayanan.', N'APPROVED', 1, CAST('2026-10-18 20:00:00' AS DATETIME2(0)), 148, CAST('2026-10-19 08:00:00' AS DATETIME2(0)), 4),
+    (17, 1, 2, 1, 55, 'ON_DUTY', 'FULL_DAY', '2026-10-22', '2026-10-22', 1.0, N'State Science Congress teacher seminar on Innovative STEM Pedagogy and Lab Safety at State Science Centre; Section 21 Science covered.', N'APPROVED', 1, CAST('2026-10-18 11:00:00' AS DATETIME2(0)), 155, CAST('2026-10-19 12:00:00' AS DATETIME2(0)), 4),
+    (18, 1, 2, 1, 62, 'CASUAL', 'HALF_DAY', '2026-10-26', '2026-10-26', 0.5, N'Attending son school parent-teacher consultation meeting in morning session; Section 21 afternoon periods conducted as per timetable.', N'APPROVED', 1, CAST('2026-10-24 11:30:00' AS DATETIME2(0)), 162, CAST('2026-10-24 16:00:00' AS DATETIME2(0)), 4),
+    (19, 1, 2, 1, 69, 'COMPENSATORY', 'FULL_DAY', '2026-10-27', '2026-10-27', 1.0, N'Compensatory leave for weekend network infrastructure upgrade and server migration on Saturday & Sunday in Computer Lab 2.', N'APPROVED', 1, CAST('2026-10-25 12:00:00' AS DATETIME2(0)), 169, CAST('2026-10-26 10:00:00' AS DATETIME2(0)), 4),
+    (20, 1, 2, 1, 75, 'ON_DUTY', 'FULL_DAY', '2026-10-16', '2026-10-17', 2.0, N'Officiating referee at Regional CBSE Athletics Meet at District Sports Complex; Section 21 PE supervised by Teacher 76 Neelam Menon.', N'APPROVED', 1, CAST('2026-10-12 15:00:00' AS DATETIME2(0)), 175, CAST('2026-10-13 10:00:00' AS DATETIME2(0)), 4);
+    SET IDENTITY_INSERT teachers_schema.teacher_leave_application OFF;
+
+    /* 3. Seed Teacher Leave Status History (Exact 1:1 Mapping) */
+    SET IDENTITY_INSERT teachers_schema.teacher_leave_status_history ON;
+    INSERT INTO teachers_schema.teacher_leave_status_history
+    (
+        teacher_leave_status_history_id,
+        teacher_leave_application_id, old_status, new_status,
+        changed_by, changed_at, remarks
+    )
+    VALUES
+    (1, 1, N'PENDING', N'APPROVED', 3, '2026-10-06 14:15:00', N'Leave sanctioned by Central Campus Principal. Section 1 Period 1 substitute confirmed.'),
+    (2, 2, N'PENDING', N'APPROVED', 3, '2026-10-12 16:30:00', N'CBSE deputation approved. Section 1 Period 2 Math coordination verified.'),
+    (3, 3, N'PENDING', N'APPROVED', 3, '2026-10-20 11:00:00', N'Approved for afternoon half-day session. Morning Period 4 practicals completed.'),
+    (4, 4, N'PENDING', N'APPROVED', 3, '2026-10-12 08:15:00', N'Medical leave granted. Section 1 Period 5 coverage arranged with Teacher 23.'),
+    (5, 5, N'PENDING', N'APPROVED', 3, '2026-10-23 15:00:00', N'Compensatory off verified against biometric overtime log and approved.'),
+    (6, 6, N'PENDING', N'APPROVED', 3, '2026-10-20 09:30:00', N'Sports escort OD sanctioned. Section 1 PE covered by Teacher 36.'),
+    (7, 7, N'PENDING', N'APPROVED', 3, '2026-10-16 11:30:00', N'Privilege leave sanctioned as per staff service entitlement regulations.'),
+    (8, 8, N'PENDING', N'REJECTED', 3, '2026-10-14 08:00:00', N'Rejected due to critical term assessment coordination duty on scheduled date.'),
+    (9, 9, N'APPROVED', N'CANCELLED', 116, '2026-10-27 16:00:00', N'Leave cancelled by applicant due to rescheduled passport appointment. Teacher attended duties.'),
+    (10, 10, N'PENDING', N'APPROVED', 3, '2026-10-26 08:15:00', N'Approved by Principal. Timetable substitution noted.'),
+    (11, 11, N'PENDING', N'APPROVED', 3, '2026-10-28 17:00:00', N'Half-day approved. Afternoon coverage assigned.'),
+    (12, 12, N'PENDING', N'APPROVED', 3, '2026-10-29 09:30:00', N'Weekend exhibition service verified. Approved.'),
+    (13, 13, N'PENDING', N'APPROVED', 3, '2026-10-12 14:00:00', N'Privilege leave sanctioned by Central Principal.'),
+    (14, 14, NULL, N'PENDING', 130, '2026-10-29 16:30:00', N'Awaiting Principal authorization and substitute allocation.'),
+    (15, 15, N'PENDING', N'APPROVED', 4, '2026-10-07 15:00:00', N'Sanctioned by North Campus Principal Mrs. Sunita Rao.'),
+    (16, 16, N'PENDING', N'APPROVED', 4, '2026-10-19 08:00:00', N'Medical leave approved for 2 days. Section 21 covered.'),
+    (17, 17, N'PENDING', N'APPROVED', 4, '2026-10-19 12:00:00', N'OD sanctioned under North Campus professional development quota.'),
+    (18, 18, N'PENDING', N'APPROVED', 4, '2026-10-24 16:00:00', N'Approved for morning half-day.'),
+    (19, 19, N'PENDING', N'APPROVED', 4, '2026-10-26 10:00:00', N'Server migration duty confirmed. Compensatory off sanctioned.'),
+    (20, 20, N'PENDING', N'APPROVED', 4, '2026-10-13 10:00:00', N'Approved under sports officiating duty quota.');
+    SET IDENTITY_INSERT teachers_schema.teacher_leave_status_history OFF;
+
+    /* 4. Synchronize teacher_leave_allowance used_days with approved applications */
+    UPDATE tla
+    SET
+        tla.sick_used_days = COALESCE(app.sick_used, 0.0),
+        tla.casual_used_days = COALESCE(app.casual_used, 0.0),
+        tla.privilege_used_days = COALESCE(app.privilege_used, 0.0),
+        tla.on_duty_used_days = COALESCE(app.onduty_used, 0.0),
+        tla.compensatory_used_days = COALESCE(app.comp_used, 0.0),
+        tla.updated_at = CAST('2026-10-31 09:00:00' AS DATETIME2(0)),
+        tla.updated_by = 1
+    FROM teachers_schema.teacher_leave_allowance tla
+    LEFT JOIN (
+        SELECT
+            teacher_id,
+            SUM(CASE WHEN leave_type = 'SICK' THEN total_days ELSE 0.0 END) AS sick_used,
+            SUM(CASE WHEN leave_type = 'CASUAL' THEN total_days ELSE 0.0 END) AS casual_used,
+            SUM(CASE WHEN leave_type = 'PRIVILEGE' THEN total_days ELSE 0.0 END) AS privilege_used,
+            SUM(CASE WHEN leave_type = 'ON_DUTY' THEN total_days ELSE 0.0 END) AS onduty_used,
+            SUM(CASE WHEN leave_type = 'COMPENSATORY' THEN total_days ELSE 0.0 END) AS comp_used
+        FROM teachers_schema.teacher_leave_application
+        WHERE status = N'APPROVED'
+        GROUP BY teacher_id
+    ) app ON app.teacher_id = tla.teacher_id
+    WHERE tla.academic_year_id = 1;
+
+
+    /* ============================================================
+       11C. TEACHER DAILY ATTENDANCE (MIGRATION 027 - 17 COLUMNS)
+       Scope: Every Active Teacher (80) x Every Calendar Day (Start to Today)
+       Correlated with Master Timetable Periods + Approved Teacher Leaves
+       100% Architecture Compliant: Zero Triggers, Zero Stored Procedures
+       Zero datetime2 invalid '+' operators (standard CONCAT & TIMEFROMPARTS)
+       ============================================================ */
+    DECLARE @TchAttStartDate DATE;
+    DECLARE @TchAttEndDate DATE = CAST(GETDATE() AS DATE);
+    DECLARE @TchAttAcademicYearId BIGINT = 1;
+
+    -- Starting date: earliest of timetable periods, approved teacher leaves, or term start 2026-08-24
+    SET @TchAttStartDate = CAST('2026-08-24' AS DATE);
+
+    DECLARE @TchMinTtDate DATE;
+    SELECT @TchMinTtDate = MIN(period_date) FROM management_schema.timetable_period WHERE period_date IS NOT NULL;
+    IF @TchMinTtDate IS NOT NULL AND @TchMinTtDate < @TchAttStartDate
+        SET @TchAttStartDate = @TchMinTtDate;
+
+    DECLARE @TchMinTlaDate DATE;
+    SELECT @TchMinTlaDate = MIN(start_date) FROM teachers_schema.teacher_leave_application WHERE start_date IS NOT NULL;
+    IF @TchMinTlaDate IS NOT NULL AND @TchMinTlaDate < @TchAttStartDate
+        SET @TchAttStartDate = @TchMinTlaDate;
+
+    IF @TchAttEndDate < @TchAttStartDate
+        SET @TchAttEndDate = @TchAttStartDate;
+
+    DECLARE @TchAttTotalDays INT = DATEDIFF(DAY, @TchAttStartDate, @TchAttEndDate) + 1;
+
+    ;WITH TchNumbers AS (
+        SELECT TOP (@TchAttTotalDays)
+            ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) - 1 AS n
+        FROM sys.all_objects a
+        CROSS JOIN sys.all_objects b
+    ),
+    TchCalendarDays AS (
+        SELECT 
+            DATEADD(DAY, n, @TchAttStartDate) AS attendance_date,
+            (DATEDIFF(DAY, '1900-01-07', DATEADD(DAY, n, @TchAttStartDate)) % 7) AS day_of_week_num -- 0 = Sunday
+        FROM TchNumbers
+    ),
+    TchTimetableSchedule AS (
+        SELECT 
+            tp.teacher_id,
+            tp.period_date,
+            MIN(tp.start_time) AS first_start_time,
+            MAX(tp.end_time) AS last_end_time,
+            COUNT(*) AS periods_count
+        FROM management_schema.timetable_period tp
+        WHERE tp.teacher_id IS NOT NULL
+        GROUP BY tp.teacher_id, tp.period_date
+    ),
+    TchActiveLeaves AS (
+        SELECT 
+            tla.teacher_id,
+            c.attendance_date,
+            tla.teacher_leave_application_id,
+            tla.leave_type,
+            tla.leave_duration_type,
+            tla.status,
+            tla.reason,
+            ROW_NUMBER() OVER (
+                PARTITION BY tla.teacher_id, c.attendance_date 
+                ORDER BY CASE WHEN tla.status = 'APPROVED' THEN 1 WHEN tla.status = 'PENDING' THEN 2 ELSE 3 END,
+                         tla.teacher_leave_application_id DESC
+            ) AS rn
+        FROM TchCalendarDays c
+        JOIN teachers_schema.teacher_leave_application tla 
+            ON c.attendance_date BETWEEN tla.start_date AND tla.end_date
+           AND tla.is_active = 1
+    ),
+    TchBaseAttendance AS (
+        SELECT 
+            t.school_id,
+            t.branch_id,
+            @TchAttAcademicYearId AS academic_year_id,
+            t.teacher_id,
+            c.attendance_date,
+            c.day_of_week_num,
+            t.user_id,
+            tts.first_start_time,
+            tts.last_end_time,
+            tts.periods_count,
+            tal.teacher_leave_application_id,
+            tal.leave_type,
+            tal.leave_duration_type,
+            tal.status AS leave_status,
+            tal.reason AS leave_reason,
+            ABS(CHECKSUM(t.teacher_id, c.attendance_date)) AS var_seed
+        FROM teachers_schema.teacher t
+        CROSS JOIN TchCalendarDays c
+        LEFT JOIN TchTimetableSchedule tts 
+            ON tts.teacher_id = t.teacher_id 
+           AND tts.period_date = c.attendance_date
+        LEFT JOIN TchActiveLeaves tal 
+            ON tal.teacher_id = t.teacher_id 
+           AND tal.attendance_date = c.attendance_date 
+           AND tal.rn = 1
+        WHERE t.is_active = 1
+    ),
+    TchAttendanceEvaluated AS (
+        SELECT 
+            b.school_id,
+            b.branch_id,
+            b.academic_year_id,
+            b.teacher_id,
+            b.attendance_date,
+            COALESCE(b.user_id, 1) AS created_by,
+
+            -- 1. Status Evaluation
+            CASE 
+                WHEN b.day_of_week_num = 0 THEN 'WEEKLY_OFF'
+                WHEN b.leave_status = 'APPROVED' AND b.leave_duration_type = 'FULL_DAY' THEN 'ON_LEAVE'
+                WHEN b.leave_status = 'APPROVED' AND b.leave_duration_type = 'HALF_DAY' THEN 'HALF_DAY'
+                WHEN b.leave_status = 'PENDING' THEN 'ABSENT'
+                WHEN b.leave_status IN ('REJECTED', 'CANCELLED') THEN 'PRESENT'
+                WHEN b.var_seed % 47 = 0 AND b.leave_status IS NULL THEN 'ABSENT'
+                ELSE 'PRESENT'
+            END AS attendance_status,
+
+            -- 2. Check-in Timestamp Evaluation (CONCAT + TIMEFROMPARTS - Zero '+' on datetime2)
+            CASE 
+                WHEN b.day_of_week_num = 0 THEN NULL
+                WHEN b.leave_status = 'APPROVED' AND b.leave_duration_type = 'FULL_DAY' THEN NULL
+                WHEN b.leave_status = 'PENDING' THEN NULL
+                WHEN b.var_seed % 47 = 0 AND b.leave_status IS NULL THEN NULL
+                WHEN b.leave_status = 'APPROVED' AND b.leave_duration_type = 'HALF_DAY' THEN 
+                    CAST(CONCAT(b.attendance_date, ' 08:15:00') AS DATETIME2(0))
+                WHEN b.var_seed % 29 = 0 AND b.leave_status IS NULL THEN 
+                    CAST(CONCAT(b.attendance_date, ' ', CONVERT(VARCHAR(8), TIMEFROMPARTS(8, 45 + (b.var_seed % 10), 0, 0, 0), 108)) AS DATETIME2(0))
+                WHEN b.first_start_time IS NOT NULL THEN 
+                    DATEADD(MINUTE, -15, CAST(CONCAT(b.attendance_date, ' ', CONVERT(VARCHAR(8), b.first_start_time, 108)) AS DATETIME2(0)))
+                ELSE 
+                    CAST(CONCAT(b.attendance_date, ' ', CONVERT(VARCHAR(8), TIMEFROMPARTS(8, 10 + (b.var_seed % 15), 0, 0, 0), 108)) AS DATETIME2(0))
+            END AS check_in_time,
+
+            -- 3. Check-out Timestamp Evaluation
+            CASE 
+                WHEN b.day_of_week_num = 0 THEN NULL
+                WHEN b.leave_status = 'APPROVED' AND b.leave_duration_type = 'FULL_DAY' THEN NULL
+                WHEN b.leave_status = 'PENDING' THEN NULL
+                WHEN b.var_seed % 47 = 0 AND b.leave_status IS NULL THEN NULL
+                WHEN b.leave_status = 'APPROVED' AND b.leave_duration_type = 'HALF_DAY' THEN 
+                    CAST(CONCAT(b.attendance_date, ' 12:30:00') AS DATETIME2(0))
+                WHEN b.var_seed % 37 = 0 AND b.leave_status IS NULL THEN 
+                    CAST(CONCAT(b.attendance_date, ' 15:30:00') AS DATETIME2(0))
+                WHEN b.var_seed % 29 = 0 AND b.leave_status IS NULL THEN 
+                    CAST(CONCAT(b.attendance_date, ' ', CONVERT(VARCHAR(8), TIMEFROMPARTS(16, 30 + (b.var_seed % 10), 0, 0, 0), 108)) AS DATETIME2(0))
+                ELSE 
+                    CAST(CONCAT(b.attendance_date, ' ', CONVERT(VARCHAR(8), TIMEFROMPARTS(16, 25 + (b.var_seed % 15), 0, 0, 0), 108)) AS DATETIME2(0))
+            END AS check_out_time,
+
+            -- 4. Contextual Remarks Evaluation
+            CASE 
+                WHEN b.day_of_week_num = 0 THEN N'Sunday Institutional Weekly Off.'
+                WHEN b.leave_status = 'APPROVED' AND b.leave_duration_type = 'FULL_DAY' THEN 
+                    CONCAT(N'Approved Full-Day ', b.leave_type, N' Leave (App #', b.teacher_leave_application_id, N'): ', LEFT(b.leave_reason, 120))
+                WHEN b.leave_status = 'APPROVED' AND b.leave_duration_type = 'HALF_DAY' THEN 
+                    CONCAT(N'Approved Half-Day ', b.leave_type, N' Leave (App #', b.teacher_leave_application_id, N'): ', LEFT(b.leave_reason, 120))
+                WHEN b.leave_status = 'PENDING' THEN 
+                    CONCAT(N'Unexcused faculty absence; ', b.leave_type, N' leave application #', b.teacher_leave_application_id, N' pending authorization.')
+                WHEN b.leave_status = 'REJECTED' THEN 
+                    CONCAT(N'Regular faculty attendance; leave application #', b.teacher_leave_application_id, N' was rejected by Principal.')
+                WHEN b.leave_status = 'CANCELLED' THEN 
+                    CONCAT(N'Regular faculty attendance; leave application #', b.teacher_leave_application_id, N' was cancelled by applicant.')
+                WHEN b.var_seed % 47 = 0 AND b.leave_status IS NULL THEN 
+                    N'Unplanned faculty absence; emergency substitute teacher assigned.'
+                WHEN b.var_seed % 29 = 0 AND b.leave_status IS NULL THEN 
+                    N'Late arrival due to arterial road traffic congestion; informed head of department.'
+                WHEN b.var_seed % 37 = 0 AND b.leave_status IS NULL THEN 
+                    N'Early departure (60 mins) approved by Principal for inter-school athletic supervision.'
+                WHEN b.periods_count IS NOT NULL THEN 
+                    CONCAT(N'Conducted ', b.periods_count, N' scheduled classes as per master timetable.')
+                ELSE 
+                    N'Regular faculty working day; curriculum planning, lab maintenance, and student mentoring.'
+            END AS remarks
+        FROM TchBaseAttendance b
+    )
+    INSERT INTO teachers_schema.teacher_attendance
+    (
+        school_id, branch_id, academic_year_id, teacher_id,
+        attendance_date, attendance_status,
+        check_in_time, check_out_time, total_worked_minutes,
+        remarks, is_active, created_at, created_by, updated_at, updated_by
+    )
+    SELECT 
+        a.school_id,
+        a.branch_id,
+        a.academic_year_id,
+        a.teacher_id,
+        a.attendance_date,
+        a.attendance_status,
+        a.check_in_time,
+        a.check_out_time,
+        CASE 
+            WHEN a.check_in_time IS NOT NULL AND a.check_out_time IS NOT NULL 
+            THEN DATEDIFF(MINUTE, a.check_in_time, a.check_out_time)
+            ELSE NULL 
+        END AS total_worked_minutes,
+        a.remarks,
+        1 AS is_active,
+        CAST(CONCAT(a.attendance_date, ' 08:00:00') AS DATETIME2(0)) AS created_at,
+        a.created_by,
+        CAST(CONCAT(a.attendance_date, ' 16:45:00') AS DATETIME2(0)) AS updated_at,
+        a.created_by AS updated_by
+    FROM TchAttendanceEvaluated a
+    ORDER BY a.teacher_id, a.attendance_date;
 
     /* ============================================================
        12. GRIEVANCES & GRIEVANCE HISTORY (40 Realistic Student Records)
@@ -3296,6 +3646,60 @@ BEGIN TRY
     FROM student_schema.grievance g
     JOIN student_schema.student st ON st.student_id = g.student_id;
     SET IDENTITY_INSERT student_schema.grievance_history OFF;
+
+    /* ============================================================
+       12B. TEACHER GRIEVANCES & GRIEVANCE HISTORY (12 Detailed Faculty Tickets)
+       Covers all 6 categories, 4 priorities, and 5 lifecycle statuses
+       Incident locations match timetable classrooms, science/computer labs & campus grounds
+       Strict 1:1 status history mapping (old_status -> new_status)
+       ============================================================ */
+
+    SET IDENTITY_INSERT teachers_schema.teacher_grievance ON;
+    INSERT INTO teachers_schema.teacher_grievance
+    (
+        teacher_grievance_id,
+        school_id, branch_id, academic_year_id, teacher_id,
+        grievance_title, grievance_category, priority,
+        incident_date, incident_location, description,
+        status, assigned_to, resolution_remarks, is_active,
+        created_at, created_by, updated_at, updated_by
+    )
+    VALUES
+    (1, 1, 1, 1, 8, N'Interactive SmartBoard HDMI and touch display failure in Room-01', 'IT_EQUIPMENT', 'HIGH', '2026-10-06', N'Room-01 (Class 1 Section A)', N'During Period 2 Mathematics class on 2026-10-06 for Section 1 (Students 1..10), the interactive touch screen disconnected repeatedly and projector HDMI threw signal errors during Linear Equations interactive geometry exercise, interrupting student instruction.', N'RESOLVED', 3, N'IT engineer replaced the faulty HDMI 2.1 cable and re-calibrated the interactive touch sensor on 2026-10-07. Verified operational with faculty.', 1, CAST('2026-10-06 11:00:00' AS DATETIME2(0)), 108, CAST('2026-10-07 16:30:00' AS DATETIME2(0)), 3),
+    (2, 1, 1, 1, 15, N'Malfunctioning fume extraction hood in Chemistry Laboratory', 'HEALTH_SAFETY', 'URGENT', '2026-10-09', N'Chemistry Laboratory (Central Campus)', N'During Period 4 Science practicals on 2026-10-09 with Section 1 students, the exhaust blower in the chemical preparation fume hood produced abnormal vibrations and failed to vent chemical fumes safely, posing health risks to students and staff.', N'RESOLVED', 3, N'Maintenance team repaired the exhaust motor bearing and replaced the HEPA filter on 2026-10-11. Airflow safety check passed 100%.', 1, CAST('2026-10-09 12:15:00' AS DATETIME2(0)), 115, CAST('2026-10-11 15:00:00' AS DATETIME2(0)), 3),
+    (3, 1, 2, 1, 48, N'Ceiling water leakage and lighting disruption near whiteboard in Room-21', 'INFRASTRUCTURE_FACILITIES', 'HIGH', '2026-10-14', N'Room-21 (North Campus Class 11 Sec A)', N'Post continuous rainfall on 2026-10-14, rainwater seeped through the ceiling joint directly above the teacher podium and short-circuited the front tube lights, compromising teaching visibility for Section 21 during Period 1 and Period 2.', N'RESOLVED', 4, N'Civil contractor sealed the roof slab joint and facility electrician rewired the LED batten lights. Completed on 2026-10-16.', 1, CAST('2026-10-14 10:30:00' AS DATETIME2(0)), 148, CAST('2026-10-16 17:00:00' AS DATETIME2(0)), 4),
+    (4, 1, 1, 1, 29, N'Discrepancy in monthly special duty allowance for Cyber Olympiad supervision', 'ADMINISTRATIVE_PAYROLL', 'MEDIUM', '2026-10-20', N'Central Campus Administration Office', N'The special duty allowance sanctioned for conducting the National Cyber Olympiad online mock sessions over two weekends was missing from the September payroll disbursement slip.', N'RESOLVED', 1, N'Accounts department verified the weekend attendance sheet approved by Principal. Arrear amount credited to October payroll cycle.', 1, CAST('2026-10-20 14:00:00' AS DATETIME2(0)), 129, CAST('2026-10-22 16:00:00' AS DATETIME2(0)), 1),
+    (5, 1, 1, 1, 1, N'Curriculum pacing discrepancy between syllabus blueprint and term exam schedule', 'ACADEMIC_POLICY', 'MEDIUM', '2026-10-16', N'Staff Conference Hall (Central Campus)', N'The updated CBSE term examination blueprint for Class 9 and 10 English Literature includes three prose chapters not scheduled for completion until November Week 2, causing syllabus coverage stress.', N'CLOSED', 3, N'Academic council met on 2026-10-18 and issued revised circular #AC/2026/102 adjusting test portion boundaries for Term-1 to covered chapters only.', 1, CAST('2026-10-16 16:30:00' AS DATETIME2(0)), 101, CAST('2026-10-19 11:00:00' AS DATETIME2(0)), 101),
+    (6, 1, 2, 1, 44, N'Inappropriate conduct and verbal hostility by external vendor delivery personnel', 'HARASSMENT_SAFEGUARDING', 'HIGH', '2026-10-22', N'North Campus Main Gate & Administration Block', N'On 2026-10-22 at 13:45 during lunch break, an external stationery delivery driver behaved belligerently and used aggressive language towards staff members when asked to register his vehicle at the security gate.', N'CLOSED', 4, N'Vendor management summoned by Principal. Driver blacklisted from school premises permanently. Vendor issued formal written apology.', 1, CAST('2026-10-22 15:00:00' AS DATETIME2(0)), 144, CAST('2026-10-24 10:00:00' AS DATETIME2(0)), 144),
+    (7, 1, 2, 1, 69, N'Network switch port flapping causing intermittent internet failure in Computer Lab 2', 'IT_EQUIPMENT', 'MEDIUM', '2026-10-27', N'Computer Lab 2 (North Campus)', N'During Period 5 Computer Science Python practicals on 2026-10-27 with Section 21 students, 15 desktop terminals lost connection to the school local code repository due to constant port flapping on Switch-02 rack.', N'UNDER_REVIEW', 4, NULL, 1, CAST('2026-10-27 15:30:00' AS DATETIME2(0)), 169, CAST('2026-10-28 09:30:00' AS DATETIME2(0)), 4),
+    (8, 1, 1, 1, 35, N'Broken perimeter chain-link fence near athletic track adjacent to public road', 'INFRASTRUCTURE_FACILITIES', 'HIGH', '2026-10-23', N'Central Campus Athletic Track & Football Field', N'A 10-foot section of the boundary fencing behind the long-jump pit was damaged due to a fallen tree branch during high winds, compromising campus perimeter security during outdoor PE classes.', N'RESOLVED', 3, N'Estate maintenance team cleared the fallen branch, replaced damaged fence posts, and reinforced the wire mesh on 2026-10-25.', 1, CAST('2026-10-23 16:00:00' AS DATETIME2(0)), 135, CAST('2026-10-25 15:00:00' AS DATETIME2(0)), 3),
+    (9, 1, 1, 1, 22, N'Expired fire extinguisher pressure cylinder in First Floor Social Science Corridor', 'HEALTH_SAFETY', 'URGENT', '2026-10-28', N'Academic Block A, 1st Floor Corridor (Rooms 01-08)', N'During routine safety drill preparation on 2026-10-28, the ABC Dry Powder fire extinguisher near Room-04 was observed with pressure gauge in the red zone and inspection tag expired.', N'OPEN', 3, NULL, 1, CAST('2026-10-28 12:00:00' AS DATETIME2(0)), 122, CAST('2026-10-28 12:00:00' AS DATETIME2(0)), 122),
+    (10, 1, 2, 1, 55, N'Insufficient allocation of weekly practical hours for Grade 10 Physics', 'ACADEMIC_POLICY', 'LOW', '2026-10-15', N'North Campus Senior Staff Room', N'The current timetable provides only 1 lab session per section per fortnight for Physics practicals, making it difficult to complete all mandatory CBSE experiments before the practical board assessments.', N'REJECTED', 4, N'Timetable committee reviewed the schedule. Additional lab access slots have been opened on zero-period Saturdays. Separate formal curriculum increase cannot be accommodated in regular weekday grid.', 1, CAST('2026-10-15 14:00:00' AS DATETIME2(0)), 155, CAST('2026-10-18 16:00:00' AS DATETIME2(0)), 4),
+    (11, 1, 1, 1, 3, N'Acoustic echo and defective microphone in Auditorium Hall during inter-school debate', 'INFRASTRUCTURE_FACILITIES', 'LOW', '2026-10-24', N'Main Auditorium (Central Campus)', N'During the Saturday Inter-House Debate competition on 2026-10-24, podium microphone 2 suffered feedback squeal and excessive acoustic reverberation.', N'RESOLVED', 3, N'Audio technician adjusted the mixer gain profiles and replaced the UHF wireless mic capsule on 2026-10-26.', 1, CAST('2026-10-24 16:00:00' AS DATETIME2(0)), 103, CAST('2026-10-26 12:00:00' AS DATETIME2(0)), 3),
+    (12, 1, 2, 1, 71, N'Laser printer paper jam sensor failure in North Campus Staff Workstation', 'IT_EQUIPMENT', 'LOW', '2026-10-29', N'North Campus Faculty Staff Room', N'The shared HP LaserJet MFP in the teachers preparation room frequently signals false paper jams, halting exam worksheet printing for Periods 1 & 2.', N'OPEN', 4, NULL, 1, CAST('2026-10-29 11:30:00' AS DATETIME2(0)), 171, CAST('2026-10-29 11:30:00' AS DATETIME2(0)), 171);
+    SET IDENTITY_INSERT teachers_schema.teacher_grievance OFF;
+
+    SET IDENTITY_INSERT teachers_schema.teacher_grievance_status_history ON;
+    INSERT INTO teachers_schema.teacher_grievance_status_history
+    (
+        teacher_grievance_status_history_id,
+        teacher_grievance_id, old_status, new_status,
+        changed_by, changed_at, remarks
+    )
+    VALUES
+    (1, 1, N'UNDER_REVIEW', N'RESOLVED', 3, '2026-10-07 16:30:00', N'Cable replaced, HDMI signal locked at 4K@60Hz, and interactive pen re-paired.'),
+    (2, 2, N'UNDER_REVIEW', N'RESOLVED', 3, '2026-10-11 15:00:00', N'Blower motor overhauled, new carbon filters installed, safety certification signed.'),
+    (3, 3, N'UNDER_REVIEW', N'RESOLVED', 4, '2026-10-16 17:00:00', N'Waterproofing polymer coat applied on roof; front electrical conduit re-insulated.'),
+    (4, 4, N'UNDER_REVIEW', N'RESOLVED', 1, '2026-10-22 16:00:00', N'Weekend supervision verified. Special allowance voucher approved for October payroll.'),
+    (5, 5, N'RESOLVED', N'CLOSED', 101, '2026-10-19 11:00:00', N'Department confirmed circular distributed to all English teachers. Ticket closed.'),
+    (6, 6, N'RESOLVED', N'CLOSED', 144, '2026-10-24 10:00:00', N'Staff satisfied with administrative action taken. Ticket closed.'),
+    (7, 7, N'OPEN', N'UNDER_REVIEW', 4, '2026-10-28 09:30:00', N'Assigned to Network Administrator. Replacement Cisco 24-port Gigabit switch requisitioned.'),
+    (8, 8, N'UNDER_REVIEW', N'RESOLVED', 3, '2026-10-25 15:00:00', N'New galvanized steel chain-link section installed and concrete base fortified.'),
+    (9, 9, NULL, N'OPEN', 122, '2026-10-28 12:00:00', N'Urgent health & safety report submitted for expired corridor fire extinguisher.'),
+    (10, 10, N'UNDER_REVIEW', N'REJECTED', 4, '2026-10-18 16:00:00', N'Rejected for regular schedule: Saturday zero-period lab access provided as workaround.'),
+    (11, 11, N'UNDER_REVIEW', N'RESOLVED', 3, '2026-10-26 12:00:00', N'Equalizer profile re-tuned for auditorium acoustic dampening; mic capsule replaced.'),
+    (12, 12, NULL, N'OPEN', 171, '2026-10-29 11:30:00', N'Staff room printer hardware fault logged.');
+    SET IDENTITY_INSERT teachers_schema.teacher_grievance_status_history OFF;
 
     /* ============================================================
        13. LIBRARY (100 Titles, 400 Copies, 80 Circulation Borrows)
@@ -3624,13 +4028,24 @@ BEGIN TRY
 
     SET IDENTITY_INSERT transport_schema.speed_measurement ON;
     INSERT INTO transport_schema.speed_measurement
-      (speed_measurement_id,trip_id,vehicle_id,recorded_at,speed_kmh)
+      (speed_measurement_id,trip_id,vehicle_id,recorded_at,speed_kmh,
+       latitude,longitude,heading_degrees,gps_fix_status,received_at)
     SELECT
       ROW_NUMBER() OVER (ORDER BY t.trip_id, n.n),
       t.trip_id,
       t.vehicle_id,
       DATEADD(MINUTE, n.n * 10, CAST('2026-08-29T07:10:00' AS DATETIME2(0))),
-      CAST(25.0 + (t.trip_id * 3 + n.n * 4) % 25 AS DECIMAL(6,2))
+      CAST(25.0 + (t.trip_id * 3 + n.n * 4) % 25 AS DECIMAL(6,2)),
+      CASE WHEN (ROW_NUMBER() OVER (ORDER BY t.trip_id, n.n)) % 4 = 0 OR (ROW_NUMBER() OVER (ORDER BY t.trip_id, n.n)) % 7 = 0 THEN NULL
+           ELSE CAST(17.385000 + ((ROW_NUMBER() OVER (ORDER BY t.trip_id, n.n)) * 0.001) AS DECIMAL(9,6)) END,
+      CASE WHEN (ROW_NUMBER() OVER (ORDER BY t.trip_id, n.n)) % 4 = 0 OR (ROW_NUMBER() OVER (ORDER BY t.trip_id, n.n)) % 7 = 0 THEN NULL
+           ELSE CAST(78.486000 + ((ROW_NUMBER() OVER (ORDER BY t.trip_id, n.n)) * 0.001) AS DECIMAL(9,6)) END,
+      CASE WHEN (ROW_NUMBER() OVER (ORDER BY t.trip_id, n.n)) % 4 = 0 OR (ROW_NUMBER() OVER (ORDER BY t.trip_id, n.n)) % 7 = 0 THEN NULL
+           ELSE CONVERT(SMALLINT, ((ROW_NUMBER() OVER (ORDER BY t.trip_id, n.n)) * 37) % 360) END,
+      CASE WHEN (ROW_NUMBER() OVER (ORDER BY t.trip_id, n.n)) % 4 = 0 THEN N'NO_FIX'
+           WHEN (ROW_NUMBER() OVER (ORDER BY t.trip_id, n.n)) % 7 = 0 THEN N'INVALID'
+           ELSE N'VALID' END,
+      SYSUTCDATETIME()
     FROM transport_schema.trip t
     CROSS JOIN (SELECT 1 n UNION ALL SELECT 2 UNION ALL SELECT 3) n;
     SET IDENTITY_INSERT transport_schema.speed_measurement OFF;
@@ -3706,6 +4121,181 @@ BEGIN TRY
     JOIN student_schema.student st ON st.student_id = ta.student_id
     WHERE ta.transport_assignment_id <= 4;
     SET IDENTITY_INSERT student_schema.transport_change_request OFF;
+
+    /* Transport Incidents: 35 Active (IDs 1..35) + 15 Resolved (IDs 36..50), 15 Archived in transport_incident_history */
+    SET IDENTITY_INSERT transport_schema.transport_incident ON;
+    ;WITH N AS
+    (
+        SELECT TOP (50)
+            ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS n
+        FROM sys.all_objects a
+        CROSS JOIN sys.all_objects b
+    )
+    INSERT INTO transport_schema.transport_incident
+    (
+        transport_incident_id, school_id, branch_id, title, description,
+        record_type, type, vehicle_id, detected_at,
+        status, attachment_url, is_active,
+        created_at, created_by, updated_at, updated_by
+    )
+    SELECT
+        n,
+        1,
+        CASE WHEN n % 2 = 0 THEN 1 ELSE 2 END,
+        CASE n % 8
+            WHEN 0 THEN N'GPS Disconnected'
+            WHEN 1 THEN N'Overspeed Alert'
+            WHEN 2 THEN N'Unexpected Route Deviation'
+            WHEN 3 THEN N'Vehicle Delay'
+            WHEN 4 THEN N'Harsh Braking Detected'
+            WHEN 5 THEN N'Unauthorized Stop'
+            WHEN 6 THEN N'Vehicle Maintenance Alert'
+            ELSE N'Passenger Attendance Mismatch'
+        END,
+        CONCAT(N'Mock transport incident generated for testing. Reference sequence ', n, N'.'),
+        CASE WHEN n % 3 = 0 THEN N'INCIDENT' ELSE N'AUTOMATED_ALERT' END,
+        CASE n % 8
+            WHEN 0 THEN N'GPS_DISCONNECTED'
+            WHEN 1 THEN N'OVERSPEED'
+            WHEN 2 THEN N'ROUTE_DEVIATION'
+            WHEN 3 THEN N'DELAY'
+            WHEN 4 THEN N'HARSH_BRAKING'
+            WHEN 5 THEN N'UNAUTHORIZED_STOP'
+            WHEN 6 THEN N'MAINTENANCE'
+            ELSE N'ATTENDANCE_MISMATCH'
+        END,
+        CASE WHEN n % 2 = 0 THEN 1 + ((n / 2) % 2) ELSE 3 + ((n / 2) % 2) END,
+        DATEADD(MINUTE, -1 * n * 13, SYSUTCDATETIME()),
+        CASE WHEN n <= 35 THEN N'NEW' ELSE N'RESOLVED' END,
+        CASE WHEN n % 5 = 0
+             THEN CONCAT(N'/attachments/incidents/incident_', n, N'.jpg')
+             ELSE NULL
+        END,
+        CASE WHEN n <= 35 THEN 1 ELSE 0 END,
+        SYSUTCDATETIME(),
+        1,
+        SYSUTCDATETIME(),
+        1
+    FROM N;
+    SET IDENTITY_INSERT transport_schema.transport_incident OFF;
+
+    /* Transport Incident History: 15 history audit logs (IDs 1..15) referencing resolved incidents 36..50 */
+    SET IDENTITY_INSERT transport_schema.transport_incident_history ON;
+    INSERT INTO transport_schema.transport_incident_history
+    (
+        transport_incident_history_id, transport_incident_id, school_id, branch_id,
+        title, description, record_type, type, vehicle_id,
+        detected_at, resolved_at, attachment_url, updated_at, updated_by
+    )
+    SELECT
+        i.transport_incident_id - 35,
+        i.transport_incident_id,
+        i.school_id,
+        i.branch_id,
+        i.title,
+        i.description,
+        i.record_type,
+        i.type,
+        i.vehicle_id,
+        i.detected_at,
+        DATEADD(MINUTE, 45 + i.transport_incident_id, i.detected_at),
+        i.attachment_url,
+        SYSUTCDATETIME(),
+        1
+    FROM transport_schema.transport_incident i
+    WHERE i.transport_incident_id BETWEEN 36 AND 50;
+    SET IDENTITY_INSERT transport_schema.transport_incident_history OFF;
+
+    /* Passenger Attendance: 35 Day Scholars mapped to Pickup Trips with explicit IDs 1..35 */
+    SET IDENTITY_INSERT transport_schema.trip_passenger_attendance ON;
+
+    ;WITH EligiblePassengers AS
+    (
+        SELECT
+            ta.school_id,
+            ta.branch_id,
+            t.trip_id,
+            st.user_id,
+            ta.transport_assignment_id,
+            ROW_NUMBER() OVER (ORDER BY ta.transport_assignment_id) AS rn
+        FROM student_schema.transport_assignment ta
+        INNER JOIN student_schema.student st
+            ON st.student_id = ta.student_id
+        INNER JOIN transport_schema.trip t
+            ON t.school_id = ta.school_id
+           AND t.branch_id = ta.branch_id
+           AND t.vehicle_route_id = ta.vehicle_route_id
+           AND t.trip_type = N'PICKUP'
+        WHERE ta.status = N'ACTIVE'
+          AND ta.is_active = 1
+          AND st.user_id IS NOT NULL
+    ),
+    AttendanceMock AS
+    (
+        SELECT TOP (35)
+            school_id,
+            branch_id,
+            trip_id,
+            user_id,
+            transport_assignment_id,
+            rn,
+            CASE
+                WHEN rn % 10 BETWEEN 1 AND 7 THEN N'BOARDED'
+                WHEN rn % 10 BETWEEN 8 AND 9 THEN N'NOT BOARDED'
+                ELSE N'NOT TRAVELLING'
+            END AS boarded_status,
+            CASE
+                WHEN rn % 10 BETWEEN 1 AND 5 THEN N'DROPPED'
+                WHEN rn % 10 BETWEEN 6 AND 7 THEN N'NOT DROPPED'
+                ELSE N'NOT TRAVELLING'
+            END AS drop_status
+        FROM EligiblePassengers
+        ORDER BY rn
+    )
+    INSERT INTO transport_schema.trip_passenger_attendance
+    (
+        trip_passenger_attendance_id, school_id, branch_id, trip_id, user_id, transport_assignment_id,
+        boarded_attendance_status, boarded_at,
+        drop_attendance_status, drop_at,
+        attendance_status, recorded_by,
+        created_at, created_by, updated_at, updated_by
+    )
+    SELECT
+        a.rn,
+        a.school_id,
+        a.branch_id,
+        a.trip_id,
+        a.user_id,
+        a.transport_assignment_id,
+        a.boarded_status,
+        CASE WHEN a.boarded_status = N'BOARDED'
+             THEN DATEADD(MINUTE, a.rn, CAST('2026-11-17T07:00:00' AS DATETIME2(0)))
+             ELSE NULL END,
+        a.drop_status,
+        CASE WHEN a.drop_status = N'DROPPED'
+             THEN DATEADD(MINUTE, a.rn, CAST('2026-11-17T08:00:00' AS DATETIME2(0)))
+             ELSE NULL END,
+        a.boarded_status,
+        CASE a.trip_id
+            WHEN 1 THEN 11 -- Mohan Rao (Attendant, Bus 1)
+            WHEN 3 THEN 12 -- Karthik Rao (Attendant, Bus 2)
+            WHEN 5 THEN 13 -- Imran Ali (Attendant, Bus 3)
+            WHEN 7 THEN 14 -- Anil Kumar (Attendant, Bus 4)
+            ELSE 11
+        END,
+        SYSUTCDATETIME(),
+        1,
+        SYSUTCDATETIME(),
+        1
+    FROM AttendanceMock a
+    WHERE NOT EXISTS
+    (
+        SELECT 1
+        FROM transport_schema.trip_passenger_attendance existing
+        WHERE existing.trip_id = a.trip_id
+          AND existing.user_id = a.user_id
+    );
+    SET IDENTITY_INSERT transport_schema.trip_passenger_attendance OFF;
 
     /* ============================================================
        15. FINANCE (Fee Structures for 20 Classes, 400 Student Records & Txns)
@@ -4378,7 +4968,49 @@ BEGIN TRY
             ELSE 0 END)) > 0.01
     ) THROW 51000, 'Finance transaction reconciliation failed.', 1;
 
-    /* 9. Application table coverage: Verify every table in all 8 schemas contains rows */
+    /* 8B. Teacher Module Coverage & Integrity Checks */
+    IF (SELECT COUNT(*) FROM teachers_schema.teacher_leave_allowance) <> 80 
+        THROW 51000, 'Expected exactly 80 teacher leave allowance records.', 1;
+
+    IF (SELECT COUNT(*) FROM teachers_schema.teacher_leave_application) <> 20 
+        THROW 51000, 'Expected exactly 20 teacher leave applications.', 1;
+
+    IF (SELECT COUNT(*) FROM teachers_schema.teacher_leave_status_history) <> 20 
+        THROW 51000, 'Expected exactly 20 teacher leave status history records (1:1 with applications).', 1;
+
+    IF (SELECT COUNT(*) FROM teachers_schema.teacher_grievance) <> 12 
+        THROW 51000, 'Expected exactly 12 teacher grievances.', 1;
+
+    IF (SELECT COUNT(*) FROM teachers_schema.teacher_grievance_status_history) <> 12 
+        THROW 51000, 'Expected exactly 12 teacher grievance status history records (1:1 with tickets).', 1;
+
+    IF NOT EXISTS (SELECT 1 FROM teachers_schema.teacher_attendance)
+        THROW 51000, 'Teacher daily attendance records must not be empty.', 1;
+
+    IF (SELECT COUNT(DISTINCT teacher_id) FROM teachers_schema.teacher_attendance) <> 80
+        THROW 51000, 'Every active teacher must have attendance records generated.', 1;
+
+    IF EXISTS (
+        SELECT teacher_id, attendance_date FROM teachers_schema.teacher_attendance
+        GROUP BY teacher_id, attendance_date HAVING COUNT(*) > 1
+    ) THROW 51000, 'Teacher attendance uniqueness constraint check failed: duplicate teacher-date detected.', 1;
+
+    IF EXISTS (
+        SELECT 1 FROM teachers_schema.teacher_attendance
+        WHERE check_out_time IS NOT NULL AND check_in_time IS NULL
+    ) THROW 51000, 'Teacher attendance check-out without check-in constraint check failed.', 1;
+
+    IF EXISTS (
+        SELECT 1 FROM teachers_schema.teacher_attendance
+        WHERE check_out_time IS NOT NULL AND total_worked_minutes IS NULL
+    ) THROW 51000, 'Teacher attendance check-out requires duration constraint check failed.', 1;
+
+    IF EXISTS (
+        SELECT 1 FROM teachers_schema.teacher_attendance
+        WHERE attendance_status = 'PRESENT' AND check_in_time IS NULL
+    ) THROW 51000, 'Teacher attendance PRESENT requires check-in constraint check failed.', 1;
+
+    /* 9. Application table coverage: Verify every table in all 9 schemas contains rows */
     DECLARE @ValidationTableName SYSNAME, @ValidationSchemaName SYSNAME, @ValidationSql NVARCHAR(MAX), @ValidationRowCount BIGINT;
     DECLARE table_cursor CURSOR LOCAL FAST_FORWARD FOR
     SELECT s.name,t.name
@@ -4407,6 +5039,12 @@ BEGIN TRY
         N'teachers_schema.teacher_subject_assignment',
         N'teachers_schema.assessment',
         N'teachers_schema.homework',
+        N'teachers_schema.teacher_attendance',
+        N'teachers_schema.teacher_leave_allowance',
+        N'teachers_schema.teacher_leave_application',
+        N'teachers_schema.teacher_leave_status_history',
+        N'teachers_schema.teacher_grievance',
+        N'teachers_schema.teacher_grievance_status_history',
         N'student_schema.student',
         N'student_schema.student_guardian',
         N'student_schema.exam_result',
@@ -4429,6 +5067,9 @@ BEGIN TRY
         N'transport_schema.trip',
         N'transport_schema.trip_stop',
         N'transport_schema.speed_measurement',
+        N'transport_schema.transport_incident',
+        N'transport_schema.transport_incident_history',
+        N'transport_schema.trip_passenger_attendance',
         N'finance_schema.fee_structure_term',
         N'finance_schema.student_fee_record',
         N'finance_schema.fee_payment_transaction',
@@ -4478,6 +5119,9 @@ BEGIN TRY
     PRINT 'Homework     : 2,400 assignments (40 sections x 12 school days x 5 core subjects, 24,000 student submissions)';
     PRINT 'Finance      : Reconciled fees, terms, and transactions across all active students';
     PRINT 'Library      : 100 catalog titles, 400 copies, 80 circulation records (Central & North)';
+    PRINT 'Attendance   : Daily attendance for all 80 teachers from timetable start to today (Migration 027 - 17 Columns)';
+    PRINT 'Leaves       : 80 teacher allowances (12 days quota) + 20 leave applications + 1:1 status history';
+    PRINT 'Grievances   : 12 detailed teacher grievance tickets across 6 categories + 1:1 status history';
     PRINT 'Email Standard: STRICTLY stu_XXXX@, tch_XXXX@, mgt_XXXX@schoolname.edu';
     PRINT '============================================================';
 

@@ -13,7 +13,7 @@ Run automatically via `migrations/000_run_all.sql`.
 
 ## 002_THINKIGEN_REALISTIC_MOCK_DATA_V22.sql
 
-Complete 48-table mock seed dataset covering realistic school operational data across all domains.
+Comprehensive 54-table master mock seed dataset covering realistic school operational data across all domains, fully integrating all 80 active teachers, master timetables, daily attendance (Migration 027 - 17 columns), teacher leave quotas & applications (Migration 026), and teacher grievances.
 
 ## 003_finance_mock_data_1_to_30.sql
 
@@ -193,6 +193,29 @@ Dedicated mock seed dataset for Teacher Portal Leave and Grievance Management (`
   - Enforces exact **1:1 lifecycle tracking** (exactly 12 rows matching the 12 grievance tickets).
   - Captures the latest status transition with prior status in `old_status` and current status in `new_status` (`UNDER_REVIEW -> RESOLVED`, `RESOLVED -> CLOSED`, `OPEN -> UNDER_REVIEW`, `UNDER_REVIEW -> REJECTED`, or `NULL -> OPEN`).
 - **Idempotency & Safety**: Fully wrapped in an atomic `BEGIN TRANSACTION` / `BEGIN TRY ... COMMIT` block with automatic rollback on error and preflight validation.
+
+## 021_teacher_attendance_mock_data.sql
+
+Dedicated mock seed dataset for Teacher Daily Attendance (`teachers_schema.teacher_attendance`), deployed via `database/migrations/027_teacher_attendance.sql`:
+- **Comprehensive Scope**: Populates daily attendance for all 80 active teachers across both Central Campus (`branch_id = 1`) and North Campus (`branch_id = 2`).
+- **Calendar Coverage**: Spans every single calendar day from timetable term start date (`2026-08-24`) up to today (`GETDATE()`).
+- **Master Timetable Integration (`management_schema.timetable_period`)**:
+  - Days with scheduled classes: Check-in set 15 minutes before the teacher's first period; check-out set after wrap-up (16:30); remarks record number of conducted periods and topics.
+  - Instructional weekdays without assigned classes: Standard faculty shift (08:15 to 16:30, 495 worked minutes); remarks document curriculum planning and lab preparation.
+- **Master Leave Integration (`teachers_schema.teacher_leave_application`)**:
+  - Approved `FULL_DAY` leave: `attendance_status = 'ON_LEAVE'`, NULL timestamps, NULL worked minutes.
+  - Approved `HALF_DAY` leave: `attendance_status = 'HALF_DAY'`, check-in 08:15, check-out 12:30 (255 worked minutes).
+  - `PENDING` leave on past dates: `attendance_status = 'ABSENT'` (unexcused absence awaiting review).
+  - `REJECTED` or `CANCELLED` leave: `attendance_status = 'PRESENT'` with regular hours and explanation.
+- **Institutional Realism**:
+  - Sundays: `attendance_status = 'WEEKLY_OFF'` with NULL timestamps and 0 worked minutes.
+  - Minor late arrivals (~3%): Check-in between 08:45 and 08:54 with transit remarks.
+  - Approved early departures (~2.5%): Check-out at 15:30 with administrative remarks.
+  - Unplanned emergency absences (~2%): `attendance_status = 'ABSENT'` with substitute assignment remark.
+- **100% Migration 027 Conformance**:
+  - Strictly adheres to the 17-column specification of `teachers_schema.teacher_attendance`.
+  - Satisfies all 7 CHECK constraints, 6 Foreign Keys, and the unique constraint `UQ_teacher_attendance_teacher_date`.
+  - Zero invalid `datetime2` arithmetic operators (uses standard `CONCAT` and `TIMEFROMPARTS`).
 
 **Production:** Do not run dev/mock seeds. Use a controlled provisioning process and bcrypt/argon2 password hashes only.
 

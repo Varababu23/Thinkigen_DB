@@ -24,6 +24,11 @@ Related: [mongodb-collections-reference.md](./mongodb-collections-reference.md) 
 
 ## Table index
 
+### `alumni_schema` (2 tables)
+
+- `alumni_schema.alumni_profile`
+- `alumni_schema.alumni_story`
+
 ### `finance_schema` (3 tables)
 
 - `finance_schema.fee_payment_transaction`
@@ -36,7 +41,7 @@ Related: [mongodb-collections-reference.md](./mongodb-collections-reference.md) 
 - `library_schema.library_book_borrow`
 - `library_schema.library_book_copy`
 
-### `management_schema` (13 tables)
+### `management_schema` (14 tables)
 
 - `management_schema.academic_year`
 - `management_schema.announcement`
@@ -44,6 +49,7 @@ Related: [mongodb-collections-reference.md](./mongodb-collections-reference.md) 
 - `management_schema.class_subject`
 - `management_schema.exam`
 - `management_schema.exam_schedule`
+- `management_schema.grievance_department`
 - `management_schema.holiday`
 - `management_schema.school`
 - `management_schema.school_class`
@@ -58,7 +64,11 @@ Related: [mongodb-collections-reference.md](./mongodb-collections-reference.md) 
 - `security_schema.user_login_attempt`
 - `security_schema.users`
 
-### `student_schema` (11 tables)
+### `sports_schema` (1 tables)
+
+- `sports_schema.student_sport_history`
+
+### `student_schema` (15 tables)
 
 - `student_schema.assessment_result`
 - `student_schema.exam_result`
@@ -66,29 +76,120 @@ Related: [mongodb-collections-reference.md](./mongodb-collections-reference.md) 
 - `student_schema.grievance_history`
 - `student_schema.homework_status`
 - `student_schema.student`
+- `student_schema.student_achievement`
 - `student_schema.student_attendance`
+- `student_schema.student_cultural_participation`
+- `student_schema.student_exam_performance`
 - `student_schema.student_guardian`
 - `student_schema.student_leave`
-- `student_schema.transport_assignment`
-- `student_schema.transport_change_request`
+- `student_schema.student_leave_status_history`
+- `student_schema.student_personality_development`
+- `student_schema.student_personality_development_review`
 
-### `teachers_schema` (4 tables)
+### `teachers_schema` (11 tables)
 
 - `teachers_schema.assessment`
 - `teachers_schema.homework`
+- `teachers_schema.section_class_teacher_assignment`
 - `teachers_schema.teacher`
+- `teachers_schema.teacher_attendance`
+- `teachers_schema.teacher_grievance`
+- `teachers_schema.teacher_grievance_status_history`
+- `teachers_schema.teacher_leave_allowance`
+- `teachers_schema.teacher_leave_application`
+- `teachers_schema.teacher_leave_status_history`
 - `teachers_schema.teacher_subject_assignment`
 
-### `transport_schema` (6 tables)
+**Total: 52 tables**
 
-- `transport_schema.speed_measurement`
-- `transport_schema.staff`
-- `transport_schema.trip`
-- `transport_schema.trip_stop`
-- `transport_schema.vehicle`
-- `transport_schema.vehicle_route`
+## `alumni_schema`
 
-**Total: 43 tables**
+### `alumni_schema.alumni_profile`
+
+- **Migration:** `020_alumni.sql`
+- **Purpose:** Alumni Management Module (SSMS)
+
+| Column | Type | Null | Notes |
+|--------|------|------|-------|
+| `alumni_id` | `BIGINT` | NOT NULL |  |
+| `school_id` | `BIGINT` | NOT NULL | School scope FK |
+| `branch_id` | `BIGINT` | NOT NULL | Branch scope FK |
+| `academic_year_id` | `BIGINT` | NOT NULL | Academic year FK |
+| `class_id` | `BIGINT` | NOT NULL | Class FK |
+| `section_id` | `BIGINT` | NOT NULL | Section FK |
+| `student_id` | `BIGINT` | NOT NULL | Student FK |
+| `passout_batch_year` | `INT` | NOT NULL |  |
+| `current_role` | `NVARCHAR(150)` | NULL |  |
+| `organisation_name` | `NVARCHAR(150)` | NULL |  |
+| `industry_name` | `NVARCHAR(100)` | NULL |  |
+| `location_city` | `NVARCHAR(100)` | NULL |  |
+| `location_country` | `NVARCHAR(100)` | NULL |  |
+| `linkedin_profile_url` | `NVARCHAR(500)` | NULL |  |
+| `verification_status` | `NVARCHAR(20)` | NOT NULL |  |
+| `verified_at` | `DATETIME2(0)` | NULL |  |
+| `verified_by` | `BIGINT` | NULL |  |
+| `profile_photo_url` | `NVARCHAR(500)` | NULL |  |
+| `is_active` | `BIT` | NOT NULL | Soft active flag |
+| `created_at` | `DATETIME2(0)` | NOT NULL | Record created (UTC) |
+| `created_by` | `BIGINT` | NOT NULL | User who created |
+| `updated_at` | `DATETIME2(0)` | NOT NULL | Record last updated (UTC) |
+| `updated_by` | `BIGINT` | NULL | User who last updated |
+| `row_version` | `ROWVERSION` | NOT NULL | Concurrency token |
+
+**Constraints**
+
+- `CONSTRAINT PK_alumni_profile PRIMARY KEY CLUSTERED (alumni_id)`
+- `CONSTRAINT UQ_alumni_profile_student UNIQUE NONCLUSTERED (student_id)`
+- `CONSTRAINT CK_alumni_profile_status CHECK (verification_status IN (N'PENDING', N'VERIFIED', N'REJECTED'))`
+- `CONSTRAINT CK_alumni_profile_batch CHECK (passout_batch_year BETWEEN 1950 AND 2100)`
+- `CONSTRAINT FK_alumni_profile_student FOREIGN KEY (student_id) REFERENCES student_schema.student (student_id)`
+- `CONSTRAINT FK_alumni_profile_school FOREIGN KEY (school_id) REFERENCES management_schema.school (school_id)`
+- `CONSTRAINT FK_alumni_profile_branch FOREIGN KEY (branch_id) REFERENCES management_schema.branch (branch_id)`
+- `CONSTRAINT FK_alumni_profile_academic_year FOREIGN KEY (academic_year_id) REFERENCES management_schema.academic_year (academic_year_id)`
+- `CONSTRAINT FK_alumni_profile_class FOREIGN KEY (class_id) REFERENCES management_schema.school_class (class_id)`
+- `CONSTRAINT FK_alumni_profile_section FOREIGN KEY (section_id) REFERENCES management_schema.section (section_id)`
+- `CONSTRAINT FK_alumni_profile_verified_by FOREIGN KEY (verified_by) REFERENCES security_schema.users (user_id)`
+- `CONSTRAINT FK_alumni_profile_created_by FOREIGN KEY (created_by) REFERENCES security_schema.users (user_id)`
+- `CONSTRAINT FK_alumni_profile_updated_by FOREIGN KEY (updated_by) REFERENCES security_schema.users (user_id)`
+
+**Indexes**
+
+- `IX_alumni_profile_school_status`
+- `IX_alumni_profile_batch`
+- `IX_alumni_profile_scope`
+
+### `alumni_schema.alumni_story`
+
+- **Migration:** `020_alumni.sql`
+- **Purpose:** Alumni Management Module (SSMS)
+
+| Column | Type | Null | Notes |
+|--------|------|------|-------|
+| `alumni_story_id` | `BIGINT` | NOT NULL |  |
+| `school_id` | `BIGINT` | NOT NULL | School scope FK |
+| `branch_id` | `BIGINT` | NOT NULL | Branch scope FK |
+| `alumni_id` | `BIGINT` | NOT NULL |  |
+| `story_title` | `NVARCHAR(200)` | NOT NULL |  |
+| `story_content` | `NVARCHAR(MAX)` | NOT NULL |  |
+| `is_published` | `BIT` | NOT NULL |  |
+| `created_at` | `DATETIME2(0)` | NOT NULL | Record created (UTC) |
+| `created_by` | `BIGINT` | NOT NULL | User who created |
+| `updated_at` | `DATETIME2(0)` | NOT NULL | Record last updated (UTC) |
+| `updated_by` | `BIGINT` | NULL | User who last updated |
+| `row_version` | `ROWVERSION` | NOT NULL | Concurrency token |
+
+**Constraints**
+
+- `CONSTRAINT PK_alumni_story PRIMARY KEY CLUSTERED (alumni_story_id)`
+- `CONSTRAINT FK_alumni_story_alumni FOREIGN KEY (alumni_id) REFERENCES alumni_schema.alumni_profile (alumni_id)`
+- `CONSTRAINT FK_alumni_story_school FOREIGN KEY (school_id) REFERENCES management_schema.school (school_id)`
+- `CONSTRAINT FK_alumni_story_branch FOREIGN KEY (branch_id) REFERENCES management_schema.branch (branch_id)`
+- `CONSTRAINT FK_alumni_story_created_by FOREIGN KEY (created_by) REFERENCES security_schema.users (user_id)`
+- `CONSTRAINT FK_alumni_story_updated_by FOREIGN KEY (updated_by) REFERENCES security_schema.users (user_id)`
+
+**Indexes**
+
+- `IX_alumni_story_school_pub`
 
 ## `finance_schema`
 
@@ -695,6 +796,34 @@ Related: [mongodb-collections-reference.md](./mongodb-collections-reference.md) 
 - `IX_exam_schedule_teacher_date`
 - `IX_exam_schedule_exam_date`
 
+### `management_schema.grievance_department`
+
+- **Migration:** `025_sports_and_grievance_department.sql`
+- **Purpose:** Synchronize missing application tables, schemas, and columns from SSMS server:
+
+| Column | Type | Null | Notes |
+|--------|------|------|-------|
+| `department_id` | `BIGINT` | NOT NULL |  |
+| `school_id` | `BIGINT` | NOT NULL | School scope FK |
+| `branch_id` | `BIGINT` | NULL | Branch scope FK |
+| `responsible_user_id` | `BIGINT` | NOT NULL |  |
+| `is_active` | `BIT` | NOT NULL | Soft active flag |
+| `created_at` | `DATETIME2(0)` | NOT NULL | Record created (UTC) |
+| `created_by` | `BIGINT` | NULL | User who created |
+| `updated_at` | `DATETIME2(0)` | NOT NULL | Record last updated (UTC) |
+| `updated_by` | `BIGINT` | NULL | User who last updated |
+| `row_version` | `ROWVERSION` | NOT NULL | Concurrency token |
+
+**Constraints**
+
+- `CONSTRAINT PK_grievance_department PRIMARY KEY CLUSTERED (department_id)`
+- `CONSTRAINT UQ_grievance_department_school_branch UNIQUE NONCLUSTERED (school_id, branch_id)`
+- `CONSTRAINT FK_grievance_department_school FOREIGN KEY (school_id) REFERENCES management_schema.school (school_id)`
+- `CONSTRAINT FK_grievance_department_branch FOREIGN KEY (branch_id) REFERENCES management_schema.branch (branch_id)`
+- `CONSTRAINT FK_grievance_department_responsible_user FOREIGN KEY (responsible_user_id) REFERENCES security_schema.users (user_id)`
+- `CONSTRAINT FK_grievance_department_created_by FOREIGN KEY (created_by) REFERENCES security_schema.users (user_id)`
+- `CONSTRAINT FK_grievance_department_updated_by FOREIGN KEY (updated_by) REFERENCES security_schema.users (user_id)`
+
 ### `management_schema.holiday`
 
 - **Migration:** `012_holidays.sql`
@@ -1006,6 +1135,50 @@ Related: [mongodb-collections-reference.md](./mongodb-collections-reference.md) 
 
 - `IX_users_user_type_active`
 
+## `sports_schema`
+
+### `sports_schema.student_sport_history`
+
+- **Migration:** `025_sports_and_grievance_department.sql`
+- **Purpose:** Synchronize missing application tables, schemas, and columns from SSMS server:
+
+| Column | Type | Null | Notes |
+|--------|------|------|-------|
+| `student_sport_history_id` | `BIGINT` | NOT NULL |  |
+| `student_id` | `BIGINT` | NOT NULL | Student FK |
+| `school_id` | `BIGINT` | NOT NULL | School scope FK |
+| `branch_id` | `BIGINT` | NOT NULL | Branch scope FK |
+| `class_id` | `BIGINT` | NOT NULL | Class FK |
+| `section_id` | `BIGINT` | NOT NULL | Section FK |
+| `sport_name` | `VARCHAR(100)` | NOT NULL |  |
+| `announcement_id` | `BIGINT` | NULL |  |
+| `activity_date` | `DATE` | NOT NULL |  |
+| `activity_name` | `VARCHAR(200)` | NOT NULL |  |
+| `result` | `VARCHAR(200)` | NULL |  |
+| `participation_status` | `VARCHAR(50)` | NOT NULL |  |
+| `created_at` | `DATETIME2(3)` | NOT NULL | Record created (UTC) |
+| `created_by` | `BIGINT` | NOT NULL | User who created |
+| `updated_at` | `DATETIME2(3)` | NULL | Record last updated (UTC) |
+| `updated_by` | `BIGINT` | NULL | User who last updated |
+| `row_version` | `ROWVERSION` | NOT NULL | Concurrency token |
+| `sport_category` | `VARCHAR(100)` | NOT NULL |  |
+
+**Constraints**
+
+- `CONSTRAINT PK_student_sport_history PRIMARY KEY CLUSTERED (student_sport_history_id)`
+- `CONSTRAINT CK_student_sport_history_status CHECK (participation_status IN ('REGISTERED', 'PARTICIPATED'))`
+- `CONSTRAINT FK_student_sport_history_student FOREIGN KEY (student_id) REFERENCES student_schema.student (student_id)`
+- `CONSTRAINT FK_student_sport_history_school FOREIGN KEY (school_id) REFERENCES management_schema.school (school_id)`
+- `CONSTRAINT FK_student_sport_history_branch FOREIGN KEY (branch_id) REFERENCES management_schema.branch (branch_id)`
+- `CONSTRAINT FK_student_sport_history_class FOREIGN KEY (class_id) REFERENCES management_schema.school_class (class_id)`
+- `CONSTRAINT FK_student_sport_history_section FOREIGN KEY (section_id) REFERENCES management_schema.section (section_id)`
+- `CONSTRAINT FK_student_sport_history_created_by FOREIGN KEY (created_by) REFERENCES security_schema.users (user_id)`
+- `CONSTRAINT FK_student_sport_history_updated_by FOREIGN KEY (updated_by) REFERENCES security_schema.users (user_id)`
+
+**Indexes**
+
+- `IX_student_sport_history_student`
+
 ## `student_schema`
 
 ### `student_schema.assessment_result`
@@ -1296,6 +1469,7 @@ Related: [mongodb-collections-reference.md](./mongodb-collections-reference.md) 
 | `updated_at` | `DATETIME2(0)` | NOT NULL | Record last updated (UTC) |
 | `updated_by` | `BIGINT` | NULL | User who last updated |
 | `row_version` | `ROWVERSION` | NOT NULL | Concurrency token |
+| `residency_type` | `NVARCHAR(20)` | NOT NULL |  |
 
 **Constraints**
 
@@ -1317,6 +1491,53 @@ Related: [mongodb-collections-reference.md](./mongodb-collections-reference.md) 
 - `IX_student_branch_status`
 - `IX_student_name`
 - `IX_student_roll_number`
+- `UQ_student_school_branch_student`
+- `UQ_student_placement_scope`
+- `UQ_student_id_placement_scope`
+
+### `student_schema.student_achievement`
+
+- **Migration:** `018_student_achievements.sql`
+- **Purpose:** Student achievements catalog and tracking
+
+| Column | Type | Null | Notes |
+|--------|------|------|-------|
+| `achievement_id` | `BIGINT` | NOT NULL |  |
+| `school_id` | `BIGINT` | NOT NULL | School scope FK |
+| `branch_id` | `BIGINT` | NOT NULL | Branch scope FK |
+| `student_id` | `BIGINT` | NOT NULL | Student FK |
+| `achievement_title` | `NVARCHAR(200)` | NOT NULL |  |
+| `category` | `NVARCHAR(100)` | NOT NULL |  |
+| `description` | `NVARCHAR(MAX)` | NULL |  |
+| `achievement_place` | `NVARCHAR(50)` | NOT NULL |  |
+| `achievement_level` | `NVARCHAR(50)` | NOT NULL |  |
+| `date_issued` | `DATE` | NOT NULL |  |
+| `certificate_url` | `NVARCHAR(500)` | NULL |  |
+| `is_active` | `BIT` | NOT NULL | Soft active flag |
+| `created_at` | `DATETIME2(0)` | NOT NULL | Record created (UTC) |
+| `created_by` | `BIGINT` | NOT NULL | User who created |
+| `updated_at` | `DATETIME2(0)` | NOT NULL | Record last updated (UTC) |
+| `updated_by` | `BIGINT` | NULL | User who last updated |
+| `row_version` | `ROWVERSION` | NOT NULL | Concurrency token |
+
+**Constraints**
+
+- `CONSTRAINT PK_student_achievement PRIMARY KEY CLUSTERED (achievement_id)`
+- `CONSTRAINT CK_student_achievement_title CHECK (LEN(LTRIM(RTRIM(achievement_title))) > 0)`
+- `CONSTRAINT CK_student_achievement_category CHECK (LEN(LTRIM(RTRIM(category))) > 0)`
+- `CONSTRAINT CK_student_achievement_place CHECK (LEN(LTRIM(RTRIM(achievement_place))) > 0)`
+- `CONSTRAINT CK_student_achievement_level CHECK`
+- `CONSTRAINT FK_student_achievement_school FOREIGN KEY (school_id) REFERENCES management_schema.school (school_id)`
+- `CONSTRAINT FK_student_achievement_branch FOREIGN KEY (branch_id) REFERENCES management_schema.branch (branch_id)`
+- `CONSTRAINT FK_student_achievement_student_scope FOREIGN KEY (school_id, branch_id, student_id)`
+- `CONSTRAINT FK_student_achievement_created_by FOREIGN KEY (created_by) REFERENCES security_schema.users (user_id)`
+- `CONSTRAINT FK_student_achievement_updated_by FOREIGN KEY (updated_by) REFERENCES security_schema.users (user_id)`
+
+**Indexes**
+
+- `IX_student_achievement_student_branch`
+- `IX_student_achievement_branch_date`
+- `IX_student_achievement_category_level`
 
 ### `student_schema.student_attendance`
 
@@ -1380,6 +1601,92 @@ Related: [mongodb-collections-reference.md](./mongodb-collections-reference.md) 
 - `IX_student_attendance_teacher_date`
 - `IX_student_attendance_status_date`
 - `IX_student_attendance_timetable_period_date`
+
+### `student_schema.student_cultural_participation`
+
+- **Migration:** `023_cultural_participation.sql`
+- **Purpose:** Store student-wise, event-wise cultural participation and performance details
+
+| Column | Type | Null | Notes |
+|--------|------|------|-------|
+| `cultural_participation_id` | `BIGINT` | NOT NULL |  |
+| `student_id` | `BIGINT` | NOT NULL | Student FK |
+| `school_id` | `BIGINT` | NOT NULL | School scope FK |
+| `branch_id` | `BIGINT` | NOT NULL | Branch scope FK |
+| `academic_year_id` | `BIGINT` | NOT NULL | Academic year FK |
+| `class_id` | `BIGINT` | NOT NULL | Class FK |
+| `section_id` | `BIGINT` | NOT NULL | Section FK |
+| `announcement_id` | `BIGINT` | NOT NULL |  |
+| `event_name` | `NVARCHAR(200)` | NOT NULL |  |
+| `teacher_id` | `BIGINT` | NOT NULL | Teacher FK |
+| `category` | `NVARCHAR(100)` | NOT NULL |  |
+| `role_involvement` | `NVARCHAR(100)` | NULL |  |
+| `result` | `NVARCHAR(100)` | NULL |  |
+| `participation_status` | `NVARCHAR(30)` | NOT NULL |  |
+| `participation_date` | `DATE` | NULL |  |
+| `is_active` | `BIT` | NOT NULL | Soft active flag |
+| `created_at` | `DATETIME2(0)` | NOT NULL | Record created (UTC) |
+| `updated_at` | `DATETIME2(0)` | NOT NULL | Record last updated (UTC) |
+| `row_version` | `ROWVERSION` | NOT NULL | Concurrency token |
+
+**Constraints**
+
+- `CONSTRAINT PK_student_cultural_participation`
+- `CONSTRAINT CK_student_cultural_part_status`
+- `CONSTRAINT CK_student_cultural_part_category`
+- `CONSTRAINT CK_student_cultural_part_role`
+- `CONSTRAINT CK_student_cultural_part_result`
+- `CONSTRAINT FK_student_cultural_part_student`
+- `CONSTRAINT FK_student_cultural_part_school`
+- `CONSTRAINT FK_student_cultural_part_branch`
+- `CONSTRAINT FK_student_cultural_part_academic_year`
+- `CONSTRAINT FK_student_cultural_part_class`
+- `CONSTRAINT FK_student_cultural_part_section`
+- `CONSTRAINT FK_student_cultural_part_announcement`
+- `CONSTRAINT FK_student_cultural_part_teacher`
+
+**Indexes**
+
+- `UX_student_cultural_part_student_announcement_active`
+- `IX_student_cultural_part_student_history`
+- `IX_student_cultural_part_announcement_active`
+- `IX_student_cultural_part_section_year`
+- `IX_student_cultural_part_teacher_active`
+- `IX_student_cultural_part_school_branch_year`
+
+### `student_schema.student_exam_performance`
+
+- **Migration:** `021_student_exam_performance.sql`
+- **Purpose:** Store backend-generated exam performance summary metrics for each student
+
+| Column | Type | Null | Notes |
+|--------|------|------|-------|
+| `student_exam_performance_id` | `BIGINT` | NOT NULL |  |
+| `student_id` | `BIGINT` | NOT NULL | Student FK |
+| `academic_year_id` | `BIGINT` | NOT NULL | Academic year FK |
+| `class_id` | `BIGINT` | NOT NULL | Class FK |
+| `section_id` | `BIGINT` | NOT NULL | Section FK |
+| `total_exams_count` | `INT` | NOT NULL |  |
+| `overall_percentage` | `DECIMAL(5, 2)` | NOT NULL |  |
+| `created_at` | `DATETIME2(0)` | NOT NULL | Record created (UTC) |
+| `updated_at` | `DATETIME2(0)` | NOT NULL | Record last updated (UTC) |
+| `row_version` | `ROWVERSION` | NOT NULL | Concurrency token |
+
+**Constraints**
+
+- `CONSTRAINT PK_student_exam_performance PRIMARY KEY CLUSTERED (student_exam_performance_id)`
+- `CONSTRAINT UQ_student_exam_performance_student_scope UNIQUE NONCLUSTERED`
+- `CONSTRAINT CK_student_exam_performance_total_exams CHECK`
+- `CONSTRAINT CK_student_exam_performance_overall_percentage CHECK`
+- `CONSTRAINT FK_student_exam_performance_student FOREIGN KEY (student_id)`
+- `CONSTRAINT FK_student_exam_performance_academic_year FOREIGN KEY (academic_year_id)`
+- `CONSTRAINT FK_student_exam_performance_class FOREIGN KEY (class_id)`
+- `CONSTRAINT FK_student_exam_performance_section FOREIGN KEY (section_id)`
+
+**Indexes**
+
+- `IX_student_exam_performance_scope`
+- `IX_student_exam_performance_student`
 
 ### `student_schema.student_guardian`
 
@@ -1452,6 +1759,10 @@ Related: [mongodb-collections-reference.md](./mongodb-collections-reference.md) 
 | `updated_at` | `DATETIME2(0)` | NOT NULL | Record last updated (UTC) |
 | `updated_by` | `BIGINT` | NULL | User who last updated |
 | `row_version` | `ROWVERSION` | NOT NULL | Concurrency token |
+| `cancelled_at` | `DATETIME2(0)` | NULL |  |
+| `cancelled_by` | `BIGINT` | NULL |  |
+| `cancellation_remarks` | `NVARCHAR(500)` | NULL |  |
+| `duration` | `DECIMAL(4, 2)` | NOT NULL |  |
 
 **Constraints**
 
@@ -1473,6 +1784,7 @@ Related: [mongodb-collections-reference.md](./mongodb-collections-reference.md) 
 - `CONSTRAINT FK_student_leave_section FOREIGN KEY (section_id) REFERENCES management_schema.section (section_id)`
 - `CONSTRAINT FK_student_leave_student FOREIGN KEY (student_id) REFERENCES student_schema.student (student_id)`
 - `CONSTRAINT FK_student_leave_reviewed_by FOREIGN KEY (reviewed_by) REFERENCES security_schema.users (user_id)`
+- `CONSTRAINT FK_student_leave_cancelled_by FOREIGN KEY (cancelled_by) REFERENCES security_schema.users (user_id)`
 - `CONSTRAINT FK_student_leave_created_by FOREIGN KEY (created_by) REFERENCES security_schema.users (user_id)`
 - `CONSTRAINT FK_student_leave_updated_by FOREIGN KEY (updated_by) REFERENCES security_schema.users (user_id)`
 
@@ -1484,28 +1796,52 @@ Related: [mongodb-collections-reference.md](./mongodb-collections-reference.md) 
 - `IX_student_leave_pending`
 - `IX_student_leave_approved_student_dates`
 
-### `student_schema.transport_assignment`
+### `student_schema.student_leave_status_history`
 
-- **Migration:** `015_transport.sql`
-- **Purpose:** Bus tracking - vehicles, routes, trips, and student transport assignments
+- **Migration:** `025_sports_and_grievance_department.sql`
+- **Purpose:** Synchronize missing application tables, schemas, and columns from SSMS server:
 
 | Column | Type | Null | Notes |
 |--------|------|------|-------|
-| `transport_assignment_id` | `BIGINT` | NOT NULL |  |
+| `student_leave_status_history_id` | `BIGINT` | NOT NULL |  |
+| `student_leave_id` | `BIGINT` | NOT NULL |  |
+| `old_status` | `NVARCHAR(20)` | NULL |  |
+| `new_status` | `NVARCHAR(20)` | NOT NULL |  |
+| `changed_by` | `BIGINT` | NOT NULL |  |
+| `changed_at` | `DATETIME2(0)` | NOT NULL |  |
+| `remarks` | `NVARCHAR(500)` | NULL |  |
+| `row_version` | `ROWVERSION` | NOT NULL | Concurrency token |
+
+**Constraints**
+
+- `CONSTRAINT PK_student_leave_status_history PRIMARY KEY CLUSTERED (student_leave_status_history_id)`
+- `CONSTRAINT FK_student_leave_status_history_leave FOREIGN KEY (student_leave_id)`
+- `CONSTRAINT FK_student_leave_status_history_changed_by FOREIGN KEY (changed_by)`
+
+**Indexes**
+
+- `IX_student_leave_status_history_leave`
+
+### `student_schema.student_personality_development`
+
+- **Migration:** `022_personal_development.sql`
+- **Purpose:** Store official student personality development ratings maintained by
+
+| Column | Type | Null | Notes |
+|--------|------|------|-------|
+| `personality_development_id` | `BIGINT` | NOT NULL |  |
 | `school_id` | `BIGINT` | NOT NULL | School scope FK |
 | `branch_id` | `BIGINT` | NOT NULL | Branch scope FK |
 | `academic_year_id` | `BIGINT` | NOT NULL | Academic year FK |
 | `class_id` | `BIGINT` | NOT NULL | Class FK |
 | `section_id` | `BIGINT` | NOT NULL | Section FK |
 | `student_id` | `BIGINT` | NOT NULL | Student FK |
-| `vehicle_route_id` | `BIGINT` | NOT NULL |  |
-| `pickup_route_stop_id` | `BIGINT` | NOT NULL |  |
-| `drop_route_stop_id` | `BIGINT` | NOT NULL |  |
-| `estimated_pickup_time` | `TIME(0)` | NOT NULL |  |
-| `estimated_drop_time` | `TIME(0)` | NOT NULL |  |
-| `effective_from` | `DATE` | NOT NULL |  |
-| `effective_to` | `DATE` | NULL |  |
-| `status` | `NVARCHAR(20)` | NOT NULL |  |
+| `class_teacher_id` | `BIGINT` | NOT NULL |  |
+| `leadership_rating` | `DECIMAL(3, 2)` | NULL |  |
+| `communication_rating` | `DECIMAL(3, 2)` | NULL |  |
+| `collaboration_rating` | `DECIMAL(3, 2)` | NULL |  |
+| `responsibility_rating` | `DECIMAL(3, 2)` | NULL |  |
+| `overall_rating` | `DECIMAL(3, 2)` | NULL |  |
 | `is_active` | `BIT` | NOT NULL | Soft active flag |
 | `created_at` | `DATETIME2(0)` | NOT NULL | Record created (UTC) |
 | `created_by` | `BIGINT` | NOT NULL | User who created |
@@ -1515,54 +1851,48 @@ Related: [mongodb-collections-reference.md](./mongodb-collections-reference.md) 
 
 **Constraints**
 
-- `CONSTRAINT PK_transport_assignment PRIMARY KEY CLUSTERED (transport_assignment_id)`
-- `CONSTRAINT CK_transport_assignment_status CHECK (status IN (N'ACTIVE', N'INACTIVE'))`
-- `CONSTRAINT CK_transport_assignment_dates CHECK`
-- `CONSTRAINT CK_transport_assignment_stop_pair CHECK (pickup_route_stop_id <> drop_route_stop_id)`
-- `CONSTRAINT FK_transport_assignment_school FOREIGN KEY (school_id) REFERENCES management_schema.school (school_id)`
-- `CONSTRAINT FK_transport_assignment_branch FOREIGN KEY (branch_id) REFERENCES management_schema.branch (branch_id)`
-- `CONSTRAINT FK_transport_assignment_academic_year FOREIGN KEY (academic_year_id) REFERENCES management_schema.academic_year (academic_year_id)`
-- `CONSTRAINT FK_transport_assignment_class FOREIGN KEY (class_id) REFERENCES management_schema.school_class (class_id)`
-- `CONSTRAINT FK_transport_assignment_section FOREIGN KEY (section_id) REFERENCES management_schema.section (section_id)`
-- `CONSTRAINT FK_transport_assignment_student_scope FOREIGN KEY (school_id, branch_id, student_id)`
-- `CONSTRAINT FK_transport_assignment_student FOREIGN KEY (student_id) REFERENCES student_schema.student (student_id)`
-- `CONSTRAINT FK_transport_assignment_vehicle_route FOREIGN KEY (vehicle_route_id) REFERENCES transport_schema.vehicle_route (vehicle_route_id)`
-- `CONSTRAINT FK_transport_assignment_pickup_stop FOREIGN KEY (branch_id, pickup_route_stop_id)`
-- `CONSTRAINT FK_transport_assignment_drop_stop FOREIGN KEY (branch_id, drop_route_stop_id)`
-- `CONSTRAINT FK_transport_assignment_created_by FOREIGN KEY (created_by) REFERENCES security_schema.users (user_id)`
-- `CONSTRAINT FK_transport_assignment_updated_by FOREIGN KEY (updated_by) REFERENCES security_schema.users (user_id)`
+- `CONSTRAINT PK_student_personality_development PRIMARY KEY CLUSTERED (personality_development_id)`
+- `CONSTRAINT UQ_student_personality_dev_student_year UNIQUE NONCLUSTERED (student_id, academic_year_id)`
+- `CONSTRAINT CK_student_personality_dev_leadership`
+- `CONSTRAINT CK_student_personality_dev_communication`
+- `CONSTRAINT CK_student_personality_dev_collaboration`
+- `CONSTRAINT CK_student_personality_dev_responsibility`
+- `CONSTRAINT CK_student_personality_dev_overall`
+- `CONSTRAINT FK_student_personality_dev_school`
+- `CONSTRAINT FK_student_personality_dev_branch`
+- `CONSTRAINT FK_student_personality_dev_academic_year`
+- `CONSTRAINT FK_student_personality_dev_class`
+- `CONSTRAINT FK_student_personality_dev_section`
+- `CONSTRAINT FK_student_personality_dev_student`
+- `CONSTRAINT FK_student_personality_dev_class_teacher`
+- `CONSTRAINT FK_student_personality_dev_created_by`
+- `CONSTRAINT FK_student_personality_dev_updated_by`
 
 **Indexes**
 
-- `UQ_transport_assignment_active_student`
-- `IX_transport_assignment_student_status`
-- `IX_transport_assignment_vehicle_route`
-- `IX_transport_assignment_branch_student`
+- `IX_student_personality_dev_student_year`
+- `IX_student_personality_dev_scope`
 
-### `student_schema.transport_change_request`
+### `student_schema.student_personality_development_review`
 
-- **Migration:** `015_transport.sql`
-- **Purpose:** Bus tracking - vehicles, routes, trips, and student transport assignments
+- **Migration:** `022_personal_development.sql`
+- **Purpose:** Store official student personality development ratings maintained by
 
 | Column | Type | Null | Notes |
 |--------|------|------|-------|
-| `transport_change_request_id` | `BIGINT` | NOT NULL |  |
+| `personality_review_id` | `BIGINT` | NOT NULL |  |
 | `school_id` | `BIGINT` | NOT NULL | School scope FK |
 | `branch_id` | `BIGINT` | NOT NULL | Branch scope FK |
+| `academic_year_id` | `BIGINT` | NOT NULL | Academic year FK |
+| `class_id` | `BIGINT` | NOT NULL | Class FK |
+| `section_id` | `BIGINT` | NOT NULL | Section FK |
 | `student_id` | `BIGINT` | NOT NULL | Student FK |
-| `request_type` | `NVARCHAR(20)` | NOT NULL |  |
-| `current_vehicle_route_id` | `BIGINT` | NOT NULL |  |
-| `requested_vehicle_route_id` | `BIGINT` | NULL |  |
-| `current_pickup_stop_id` | `BIGINT` | NOT NULL |  |
-| `requested_pickup_stop_id` | `BIGINT` | NULL |  |
-| `current_drop_stop_id` | `BIGINT` | NOT NULL |  |
-| `requested_drop_stop_id` | `BIGINT` | NULL |  |
-| `effective_date` | `DATE` | NOT NULL |  |
-| `return_date` | `DATE` | NULL |  |
-| `reason` | `NVARCHAR(500)` | NOT NULL |  |
-| `status` | `NVARCHAR(20)` | NOT NULL |  |
-| `reviewed_by` | `BIGINT` | NULL |  |
-| `reviewed_at` | `DATETIME2(0)` | NULL |  |
+| `teacher_id` | `BIGINT` | NOT NULL | Teacher FK |
+| `subject_id` | `BIGINT` | NOT NULL | Subject FK |
+| `category_type` | `NVARCHAR(50)` | NOT NULL |  |
+| `rating` | `INT` | NOT NULL |  |
+| `review` | `NVARCHAR(MAX)` | NOT NULL |  |
+| `review_date` | `DATE` | NOT NULL |  |
 | `is_active` | `BIT` | NOT NULL | Soft active flag |
 | `created_at` | `DATETIME2(0)` | NOT NULL | Record created (UTC) |
 | `created_by` | `BIGINT` | NOT NULL | User who created |
@@ -1572,30 +1902,27 @@ Related: [mongodb-collections-reference.md](./mongodb-collections-reference.md) 
 
 **Constraints**
 
-- `CONSTRAINT PK_transport_change_request PRIMARY KEY CLUSTERED (transport_change_request_id)`
-- `CONSTRAINT CK_transport_change_request_type CHECK`
-- `CONSTRAINT CK_transport_change_request_status CHECK`
-- `CONSTRAINT CK_transport_change_request_return_date CHECK`
-- `CONSTRAINT CK_transport_change_request_reason CHECK (LEN(LTRIM(RTRIM(reason))) > 0)`
-- `CONSTRAINT CK_transport_change_request_review_state CHECK`
-- `CONSTRAINT CK_transport_change_request_effective_date CHECK (effective_date >= CAST(SYSDATETIME() AS date) OR status = N'PENDING' OR status = N'REJECTED')`
-- `CONSTRAINT FK_transport_change_request_school FOREIGN KEY (school_id) REFERENCES management_schema.school (school_id)`
-- `CONSTRAINT FK_transport_change_request_branch FOREIGN KEY (branch_id) REFERENCES management_schema.branch (branch_id)`
-- `CONSTRAINT FK_transport_change_request_student FOREIGN KEY (student_id) REFERENCES student_schema.student (student_id)`
-- `CONSTRAINT FK_transport_change_request_current_route FOREIGN KEY (current_vehicle_route_id) REFERENCES transport_schema.vehicle_route (vehicle_route_id)`
-- `CONSTRAINT FK_transport_change_request_requested_route FOREIGN KEY (requested_vehicle_route_id) REFERENCES transport_schema.vehicle_route (vehicle_route_id)`
-- `CONSTRAINT FK_transport_change_request_current_pickup FOREIGN KEY (branch_id, current_pickup_stop_id)`
-- `CONSTRAINT FK_transport_change_request_requested_pickup FOREIGN KEY (branch_id, requested_pickup_stop_id)`
-- `CONSTRAINT FK_transport_change_request_current_drop FOREIGN KEY (branch_id, current_drop_stop_id)`
-- `CONSTRAINT FK_transport_change_request_requested_drop FOREIGN KEY (branch_id, requested_drop_stop_id)`
-- `CONSTRAINT FK_transport_change_request_reviewed_by FOREIGN KEY (reviewed_by) REFERENCES security_schema.users (user_id)`
-- `CONSTRAINT FK_transport_change_request_created_by FOREIGN KEY (created_by) REFERENCES security_schema.users (user_id)`
-- `CONSTRAINT FK_transport_change_request_updated_by FOREIGN KEY (updated_by) REFERENCES security_schema.users (user_id)`
+- `CONSTRAINT PK_student_personality_development_review PRIMARY KEY CLUSTERED (personality_review_id)`
+- `CONSTRAINT UQ_student_personality_dev_rev_session UNIQUE NONCLUSTERED`
+- `CONSTRAINT CK_student_personality_dev_rev_text`
+- `CONSTRAINT CK_student_personality_dev_rev_category`
+- `CONSTRAINT CK_student_personality_dev_rev_rating`
+- `CONSTRAINT FK_student_personality_dev_rev_school`
+- `CONSTRAINT FK_student_personality_dev_rev_branch`
+- `CONSTRAINT FK_student_personality_dev_rev_academic_year`
+- `CONSTRAINT FK_student_personality_dev_rev_class`
+- `CONSTRAINT FK_student_personality_dev_rev_section`
+- `CONSTRAINT FK_student_personality_dev_rev_student`
+- `CONSTRAINT FK_student_personality_dev_rev_teacher`
+- `CONSTRAINT FK_student_personality_dev_rev_subject`
+- `CONSTRAINT FK_student_personality_dev_rev_created_by`
+- `CONSTRAINT FK_student_personality_dev_rev_updated_by`
 
 **Indexes**
 
-- `IX_transport_change_request_student_status`
-- `IX_transport_change_request_pending_branch`
+- `IX_student_personality_dev_rev_student_year`
+- `IX_student_personality_dev_rev_student_subject_year`
+- `IX_student_personality_dev_rev_teacher_subject`
 
 ## `teachers_schema`
 
@@ -1701,6 +2028,44 @@ Related: [mongodb-collections-reference.md](./mongodb-collections-reference.md) 
 - `IX_homework_scope_status_deadline`
 - `IX_homework_teacher_active`
 
+### `teachers_schema.section_class_teacher_assignment`
+
+- **Migration:** `019_student_residency_and_section_class_teacher.sql`
+- **Purpose:** - Classify each student as a hosteller or day scholar.
+
+| Column | Type | Null | Notes |
+|--------|------|------|-------|
+| `section_class_teacher_assignment_id` | `BIGINT` | NOT NULL |  |
+| `school_id` | `BIGINT` | NOT NULL | School scope FK |
+| `branch_id` | `BIGINT` | NOT NULL | Branch scope FK |
+| `academic_year_id` | `BIGINT` | NOT NULL | Academic year FK |
+| `class_id` | `BIGINT` | NOT NULL | Class FK |
+| `section_id` | `BIGINT` | NOT NULL | Section FK |
+| `teacher_id` | `BIGINT` | NOT NULL | Teacher FK |
+| `is_active` | `BIT` | NOT NULL | Soft active flag |
+| `created_at` | `DATETIME2(0)` | NOT NULL | Record created (UTC) |
+| `created_by` | `BIGINT` | NOT NULL | User who created |
+| `updated_at` | `DATETIME2(0)` | NOT NULL | Record last updated (UTC) |
+| `updated_by` | `BIGINT` | NULL | User who last updated |
+| `row_version` | `ROWVERSION` | NOT NULL | Concurrency token |
+
+**Constraints**
+
+- `CONSTRAINT PK_section_class_teacher_assignment PRIMARY KEY CLUSTERED (section_class_teacher_assignment_id)`
+- `CONSTRAINT FK_section_class_teacher_assignment_school FOREIGN KEY (school_id) REFERENCES management_schema.school (school_id)`
+- `CONSTRAINT FK_section_class_teacher_assignment_branch_scope FOREIGN KEY (school_id, branch_id)`
+- `CONSTRAINT FK_section_class_teacher_assignment_academic_year_scope FOREIGN KEY (school_id, academic_year_id)`
+- `CONSTRAINT FK_section_class_teacher_assignment_class_scope FOREIGN KEY (school_id, class_id)`
+- `CONSTRAINT FK_section_class_teacher_assignment_section_scope FOREIGN KEY (class_id, section_id)`
+- `CONSTRAINT FK_section_class_teacher_assignment_teacher_scope FOREIGN KEY (school_id, branch_id, teacher_id)`
+- `CONSTRAINT FK_section_class_teacher_assignment_created_by FOREIGN KEY (created_by)`
+- `CONSTRAINT FK_section_class_teacher_assignment_updated_by FOREIGN KEY (updated_by)`
+
+**Indexes**
+
+- `UX_section_class_teacher_assignment_active_scope`
+- `IX_section_class_teacher_assignment_teacher_active`
+
 ### `teachers_schema.teacher`
 
 - **Migration:** `004_teacher.sql`
@@ -1713,6 +2078,7 @@ Related: [mongodb-collections-reference.md](./mongodb-collections-reference.md) 
 | `school_id` | `BIGINT` | NOT NULL | School scope FK |
 | `branch_id` | `BIGINT` | NOT NULL | Branch scope FK |
 | `subject_id` | `BIGINT` | NULL | Subject FK |
+| `designation` | `VARCHAR(100)` | NOT NULL |  |
 | `employee_code` | `NVARCHAR(50)` | NOT NULL |  |
 | `first_name` | `NVARCHAR(100)` | NOT NULL |  |
 | `middle_name` | `NVARCHAR(100)` | NULL |  |
@@ -1744,6 +2110,257 @@ Related: [mongodb-collections-reference.md](./mongodb-collections-reference.md) 
 
 - `IX_teacher_school_branch_active`
 - `IX_teacher_subject_active`
+
+### `teachers_schema.teacher_attendance`
+
+- **Migration:** `027_teacher_attendance.sql`
+- **Purpose:** teachers_schema
+
+| Column | Type | Null | Notes |
+|--------|------|------|-------|
+| `teacher_attendance_id` | `BIGINT` | NOT NULL |  |
+| `school_id` | `BIGINT` | NOT NULL | School scope FK |
+| `branch_id` | `BIGINT` | NOT NULL | Branch scope FK |
+| `academic_year_id` | `BIGINT` | NOT NULL | Academic year FK |
+| `teacher_id` | `BIGINT` | NOT NULL | Teacher FK |
+| `attendance_date` | `DATE` | NOT NULL |  |
+| `attendance_status` | `VARCHAR(20)` | NOT NULL |  |
+| `check_in_time` | `DATETIME2(0)` | NULL |  |
+| `check_out_time` | `DATETIME2(0)` | NULL |  |
+| `total_worked_minutes` | `INT` | NULL |  |
+| `remarks` | `NVARCHAR(500)` | NULL |  |
+| `is_active` | `BIT` | NOT NULL | Soft active flag |
+| `created_at` | `DATETIME2(0)` | NOT NULL | Record created (UTC) |
+| `created_by` | `BIGINT` | NOT NULL | User who created |
+| `updated_at` | `DATETIME2(0)` | NOT NULL | Record last updated (UTC) |
+| `updated_by` | `BIGINT` | NULL | User who last updated |
+| `row_version` | `ROWVERSION` | NOT NULL | Concurrency token |
+
+**Constraints**
+
+- `CONSTRAINT PK_teacher_attendance PRIMARY KEY CLUSTERED (teacher_attendance_id)`
+- `CONSTRAINT UQ_teacher_attendance_teacher_date UNIQUE NONCLUSTERED (teacher_id, attendance_date)`
+- `CONSTRAINT CK_teacher_attendance_status CHECK`
+- `CONSTRAINT CK_teacher_attendance_checkout_requires_checkin CHECK`
+- `CONSTRAINT CK_teacher_attendance_time_order CHECK`
+- `CONSTRAINT CK_teacher_attendance_worked_minutes CHECK`
+- `CONSTRAINT CK_teacher_attendance_checkout_requires_duration CHECK`
+- `CONSTRAINT CK_teacher_attendance_present_requires_checkin CHECK`
+- `CONSTRAINT CK_teacher_attendance_inactive_no_timestamps CHECK`
+- `CONSTRAINT FK_teacher_attendance_school FOREIGN KEY (school_id)`
+- `CONSTRAINT FK_teacher_attendance_branch_scope FOREIGN KEY (school_id, branch_id)`
+- `CONSTRAINT FK_teacher_attendance_academic_year_scope FOREIGN KEY (school_id, academic_year_id)`
+- `CONSTRAINT FK_teacher_attendance_teacher FOREIGN KEY (teacher_id)`
+- `CONSTRAINT FK_teacher_attendance_created_by FOREIGN KEY (created_by)`
+- `CONSTRAINT FK_teacher_attendance_updated_by FOREIGN KEY (updated_by)`
+
+**Indexes**
+
+- `IX_teacher_attendance_branch_daily`
+- `IX_teacher_attendance_teacher_history`
+
+### `teachers_schema.teacher_grievance`
+
+- **Migration:** `026_teacher_leave_and_grievance.sql`
+- **Purpose:** Production-ready, non-destructive DDL migration for:
+
+| Column | Type | Null | Notes |
+|--------|------|------|-------|
+| `teacher_grievance_id` | `BIGINT` | NOT NULL |  |
+| `school_id` | `BIGINT` | NOT NULL | School scope FK |
+| `branch_id` | `BIGINT` | NOT NULL | Branch scope FK |
+| `academic_year_id` | `BIGINT` | NULL | Academic year FK |
+| `teacher_id` | `BIGINT` | NOT NULL | Teacher FK |
+| `grievance_title` | `NVARCHAR(200)` | NOT NULL |  |
+| `grievance_category` | `VARCHAR(50)` | NOT NULL |  |
+| `priority` | `VARCHAR(20)` | NOT NULL |  |
+| `incident_date` | `DATE` | NULL |  |
+| `incident_location` | `NVARCHAR(200)` | NULL |  |
+| `description` | `NVARCHAR(2000)` | NOT NULL |  |
+| `status` | `NVARCHAR(20)` | NOT NULL |  |
+| `assigned_to` | `BIGINT` | NULL |  |
+| `resolution_remarks` | `NVARCHAR(2000)` | NULL |  |
+| `is_active` | `BIT` | NOT NULL | Soft active flag |
+| `created_at` | `DATETIME2(0)` | NOT NULL | Record created (UTC) |
+| `created_by` | `BIGINT` | NOT NULL | User who created |
+| `updated_at` | `DATETIME2(0)` | NOT NULL | Record last updated (UTC) |
+| `updated_by` | `BIGINT` | NULL | User who last updated |
+| `row_version` | `ROWVERSION` | NOT NULL | Concurrency token |
+
+**Constraints**
+
+- `CONSTRAINT PK_teacher_grievance PRIMARY KEY CLUSTERED (teacher_grievance_id)`
+- `CONSTRAINT CK_teacher_grievance_category CHECK`
+- `CONSTRAINT CK_teacher_grievance_priority CHECK`
+- `CONSTRAINT CK_teacher_grievance_status CHECK`
+- `CONSTRAINT FK_teacher_grievance_school FOREIGN KEY (school_id)`
+- `CONSTRAINT FK_teacher_grievance_branch_scope FOREIGN KEY (school_id, branch_id)`
+- `CONSTRAINT FK_teacher_grievance_academic_year_scope FOREIGN KEY (school_id, academic_year_id)`
+- `CONSTRAINT FK_teacher_grievance_teacher FOREIGN KEY (teacher_id)`
+- `CONSTRAINT FK_teacher_grievance_assigned_to FOREIGN KEY (assigned_to)`
+- `CONSTRAINT FK_teacher_grievance_created_by FOREIGN KEY (created_by)`
+- `CONSTRAINT FK_teacher_grievance_updated_by FOREIGN KEY (updated_by)`
+
+**Indexes**
+
+- `IX_teacher_grievance_teacher_scope`
+- `IX_teacher_grievance_school_branch_status`
+
+### `teachers_schema.teacher_grievance_status_history`
+
+- **Migration:** `026_teacher_leave_and_grievance.sql`
+- **Purpose:** Production-ready, non-destructive DDL migration for:
+
+| Column | Type | Null | Notes |
+|--------|------|------|-------|
+| `teacher_grievance_status_history_id` | `BIGINT` | NOT NULL |  |
+| `teacher_grievance_id` | `BIGINT` | NOT NULL |  |
+| `old_status` | `NVARCHAR(20)` | NULL |  |
+| `new_status` | `NVARCHAR(20)` | NOT NULL |  |
+| `changed_by` | `BIGINT` | NOT NULL |  |
+| `changed_at` | `DATETIME2(0)` | NOT NULL |  |
+| `remarks` | `NVARCHAR(500)` | NULL |  |
+| `row_version` | `ROWVERSION` | NOT NULL | Concurrency token |
+
+**Constraints**
+
+- `CONSTRAINT PK_teacher_grievance_status_history PRIMARY KEY CLUSTERED (teacher_grievance_status_history_id)`
+- `CONSTRAINT CK_teacher_grievance_status_history_old CHECK`
+- `CONSTRAINT CK_teacher_grievance_status_history_new CHECK`
+- `CONSTRAINT FK_teacher_grievance_status_history_grievance FOREIGN KEY (teacher_grievance_id)`
+- `CONSTRAINT FK_teacher_grievance_status_history_changed_by FOREIGN KEY (changed_by)`
+
+**Indexes**
+
+- `IX_teacher_grievance_history_grievance_date`
+
+### `teachers_schema.teacher_leave_allowance`
+
+- **Migration:** `026_teacher_leave_and_grievance.sql`
+- **Purpose:** Production-ready, non-destructive DDL migration for:
+
+| Column | Type | Null | Notes |
+|--------|------|------|-------|
+| `teacher_leave_allowance_id` | `BIGINT` | NOT NULL |  |
+| `school_id` | `BIGINT` | NOT NULL | School scope FK |
+| `branch_id` | `BIGINT` | NOT NULL | Branch scope FK |
+| `academic_year_id` | `BIGINT` | NOT NULL | Academic year FK |
+| `teacher_id` | `BIGINT` | NOT NULL | Teacher FK |
+| `sick_total_days` | `DECIMAL(4, 1)` | NOT NULL |  |
+| `sick_used_days` | `DECIMAL(4, 1)` | NOT NULL |  |
+| `sick_remaining_days` | `AS (sick_total_days - sick_used_days) PERSISTED` | computed |  |
+| `casual_total_days` | `DECIMAL(4, 1)` | NOT NULL |  |
+| `casual_used_days` | `DECIMAL(4, 1)` | NOT NULL |  |
+| `casual_remaining_days` | `AS (casual_total_days - casual_used_days) PERSISTED` | computed |  |
+| `privilege_total_days` | `DECIMAL(4, 1)` | NOT NULL |  |
+| `privilege_used_days` | `DECIMAL(4, 1)` | NOT NULL |  |
+| `privilege_remaining_days` | `AS (privilege_total_days - privilege_used_days) PERSISTED` | computed |  |
+| `on_duty_total_days` | `DECIMAL(4, 1)` | NOT NULL |  |
+| `on_duty_used_days` | `DECIMAL(4, 1)` | NOT NULL |  |
+| `on_duty_remaining_days` | `AS (on_duty_total_days - on_duty_used_days) PERSISTED` | computed |  |
+| `compensatory_total_days` | `DECIMAL(4, 1)` | NOT NULL |  |
+| `compensatory_used_days` | `DECIMAL(4, 1)` | NOT NULL |  |
+| `compensatory_remaining_days` | `AS (compensatory_total_days - compensatory_used_days) PERSISTED` | computed |  |
+| `is_active` | `BIT` | NOT NULL | Soft active flag |
+| `created_at` | `DATETIME2(0)` | NOT NULL | Record created (UTC) |
+| `created_by` | `BIGINT` | NOT NULL | User who created |
+| `updated_at` | `DATETIME2(0)` | NOT NULL | Record last updated (UTC) |
+| `updated_by` | `BIGINT` | NULL | User who last updated |
+| `row_version` | `ROWVERSION` | NOT NULL | Concurrency token |
+
+**Constraints**
+
+- `CONSTRAINT PK_teacher_leave_allowance PRIMARY KEY CLUSTERED (teacher_leave_allowance_id)`
+- `CONSTRAINT UQ_teacher_leave_allowance UNIQUE NONCLUSTERED (school_id, branch_id, academic_year_id, teacher_id)`
+- `CONSTRAINT CK_teacher_leave_allowance_days_valid CHECK (`
+- `CONSTRAINT FK_teacher_leave_allowance_school FOREIGN KEY (school_id)`
+- `CONSTRAINT FK_teacher_leave_allowance_branch_scope FOREIGN KEY (school_id, branch_id)`
+- `CONSTRAINT FK_teacher_leave_allowance_academic_year_scope FOREIGN KEY (school_id, academic_year_id)`
+- `CONSTRAINT FK_teacher_leave_allowance_teacher FOREIGN KEY (teacher_id)`
+- `CONSTRAINT FK_teacher_leave_allowance_created_by FOREIGN KEY (created_by)`
+- `CONSTRAINT FK_teacher_leave_allowance_updated_by FOREIGN KEY (updated_by)`
+
+**Indexes**
+
+- `IX_teacher_leave_allowance_teacher_year`
+
+### `teachers_schema.teacher_leave_application`
+
+- **Migration:** `026_teacher_leave_and_grievance.sql`
+- **Purpose:** Production-ready, non-destructive DDL migration for:
+
+| Column | Type | Null | Notes |
+|--------|------|------|-------|
+| `teacher_leave_application_id` | `BIGINT` | NOT NULL |  |
+| `school_id` | `BIGINT` | NOT NULL | School scope FK |
+| `branch_id` | `BIGINT` | NOT NULL | Branch scope FK |
+| `academic_year_id` | `BIGINT` | NOT NULL | Academic year FK |
+| `teacher_id` | `BIGINT` | NOT NULL | Teacher FK |
+| `leave_type` | `VARCHAR(30)` | NOT NULL |  |
+| `leave_duration_type` | `VARCHAR(20)` | NOT NULL |  |
+| `start_date` | `DATE` | NOT NULL |  |
+| `end_date` | `DATE` | NOT NULL |  |
+| `total_days` | `DECIMAL(4, 1)` | NOT NULL |  |
+| `reason` | `NVARCHAR(500)` | NOT NULL |  |
+| `status` | `NVARCHAR(20)` | NOT NULL |  |
+| `is_active` | `BIT` | NOT NULL | Soft active flag |
+| `created_at` | `DATETIME2(0)` | NOT NULL | Record created (UTC) |
+| `created_by` | `BIGINT` | NOT NULL | User who created |
+| `updated_at` | `DATETIME2(0)` | NOT NULL | Record last updated (UTC) |
+| `updated_by` | `BIGINT` | NULL | User who last updated |
+| `row_version` | `ROWVERSION` | NOT NULL | Concurrency token |
+
+**Constraints**
+
+- `CONSTRAINT PK_teacher_leave_application PRIMARY KEY CLUSTERED (teacher_leave_application_id)`
+- `CONSTRAINT CK_teacher_leave_application_type CHECK`
+- `CONSTRAINT CK_teacher_leave_application_duration CHECK`
+- `CONSTRAINT CK_teacher_leave_application_status CHECK`
+- `CONSTRAINT CK_teacher_leave_application_dates CHECK (end_date >= start_date)`
+- `CONSTRAINT CK_teacher_leave_application_total_days CHECK (total_days > 0.0)`
+- `CONSTRAINT CK_teacher_leave_application_half_day CHECK`
+- `CONSTRAINT CK_teacher_leave_application_full_day CHECK`
+- `CONSTRAINT FK_teacher_leave_application_school FOREIGN KEY (school_id)`
+- `CONSTRAINT FK_teacher_leave_application_branch_scope FOREIGN KEY (school_id, branch_id)`
+- `CONSTRAINT FK_teacher_leave_application_academic_year_scope FOREIGN KEY (school_id, academic_year_id)`
+- `CONSTRAINT FK_teacher_leave_application_teacher FOREIGN KEY (teacher_id)`
+- `CONSTRAINT FK_teacher_leave_application_allowance_scope FOREIGN KEY`
+- `CONSTRAINT FK_teacher_leave_application_created_by FOREIGN KEY (created_by)`
+- `CONSTRAINT FK_teacher_leave_application_updated_by FOREIGN KEY (updated_by)`
+
+**Indexes**
+
+- `IX_teacher_leave_application_teacher_year_status`
+- `IX_teacher_leave_application_school_branch_dates`
+- `IX_teacher_leave_application_active_overlap`
+
+### `teachers_schema.teacher_leave_status_history`
+
+- **Migration:** `026_teacher_leave_and_grievance.sql`
+- **Purpose:** Production-ready, non-destructive DDL migration for:
+
+| Column | Type | Null | Notes |
+|--------|------|------|-------|
+| `teacher_leave_status_history_id` | `BIGINT` | NOT NULL |  |
+| `teacher_leave_application_id` | `BIGINT` | NOT NULL |  |
+| `old_status` | `NVARCHAR(20)` | NULL |  |
+| `new_status` | `NVARCHAR(20)` | NOT NULL |  |
+| `changed_by` | `BIGINT` | NOT NULL |  |
+| `changed_at` | `DATETIME2(0)` | NOT NULL |  |
+| `remarks` | `NVARCHAR(500)` | NULL |  |
+| `row_version` | `ROWVERSION` | NOT NULL | Concurrency token |
+
+**Constraints**
+
+- `CONSTRAINT PK_teacher_leave_status_history PRIMARY KEY CLUSTERED (teacher_leave_status_history_id)`
+- `CONSTRAINT CK_teacher_leave_status_history_old CHECK`
+- `CONSTRAINT CK_teacher_leave_status_history_new CHECK`
+- `CONSTRAINT FK_teacher_leave_status_history_app FOREIGN KEY (teacher_leave_application_id)`
+- `CONSTRAINT FK_teacher_leave_status_history_changed_by FOREIGN KEY (changed_by)`
+
+**Indexes**
+
+- `IX_teacher_leave_status_history_app_date`
 
 ### `teachers_schema.teacher_subject_assignment`
 
@@ -1788,265 +2405,9 @@ Related: [mongodb-collections-reference.md](./mongodb-collections-reference.md) 
 - `IX_teacher_subject_assignment_teacher_active`
 - `IX_teacher_subject_assignment_section_active`
 
-## `transport_schema`
-
-### `transport_schema.speed_measurement`
-
-- **Migration:** `015_transport.sql`
-- **Purpose:** Bus tracking - vehicles, routes, trips, and student transport assignments
-
-| Column | Type | Null | Notes |
-|--------|------|------|-------|
-| `speed_measurement_id` | `BIGINT` | NOT NULL |  |
-| `trip_id` | `BIGINT` | NOT NULL |  |
-| `vehicle_id` | `BIGINT` | NOT NULL |  |
-| `recorded_at` | `DATETIME2(0)` | NOT NULL | Recorded timestamp (UTC) |
-| `speed_kmh` | `DECIMAL(6, 2)` | NOT NULL |  |
-| `created_at` | `DATETIME2(0)` | NOT NULL | Record created (UTC) |
-
-**Constraints**
-
-- `CONSTRAINT PK_speed_measurement PRIMARY KEY CLUSTERED (speed_measurement_id)`
-- `CONSTRAINT CK_speed_measurement_speed CHECK (speed_kmh >= 0)`
-- `CONSTRAINT FK_speed_measurement_trip FOREIGN KEY (trip_id) REFERENCES transport_schema.trip (trip_id)`
-- `CONSTRAINT FK_speed_measurement_vehicle FOREIGN KEY (vehicle_id) REFERENCES transport_schema.vehicle (vehicle_id)`
-
-**Indexes**
-
-- `IX_speed_measurement_trip_time`
-- `IX_speed_measurement_vehicle_time`
-
-### `transport_schema.staff`
-
-- **Migration:** `015_transport.sql`
-- **Purpose:** Bus tracking - vehicles, routes, trips, and student transport assignments
-
-| Column | Type | Null | Notes |
-|--------|------|------|-------|
-| `staff_id` | `BIGINT` | NOT NULL |  |
-| `school_id` | `BIGINT` | NOT NULL | School scope FK |
-| `branch_id` | `BIGINT` | NOT NULL | Branch scope FK |
-| `user_id` | `BIGINT` | NULL | User FK |
-| `staff_name` | `NVARCHAR(150)` | NOT NULL |  |
-| `staff_type` | `NVARCHAR(30)` | NOT NULL |  |
-| `experience` | `INT` | NOT NULL | Years of professional experience |
-| `mobile_number` | `NVARCHAR(20)` | NULL |  |
-| `license_number` | `NVARCHAR(50)` | NULL |  |
-| `license_expiry_date` | `DATE` | NULL |  |
-| `status` | `NVARCHAR(20)` | NOT NULL |  |
-| `is_active` | `BIT` | NOT NULL | Soft active flag |
-| `created_at` | `DATETIME2(0)` | NOT NULL | Record created (UTC) |
-| `created_by` | `BIGINT` | NOT NULL | User who created |
-| `updated_at` | `DATETIME2(0)` | NOT NULL | Record last updated (UTC) |
-| `updated_by` | `BIGINT` | NULL | User who last updated |
-| `row_version` | `ROWVERSION` | NOT NULL | Concurrency token |
-
-**Constraints**
-
-- `CONSTRAINT PK_transport_staff PRIMARY KEY CLUSTERED (staff_id)`
-- `CONSTRAINT CK_transport_staff_name CHECK (LEN(LTRIM(RTRIM(staff_name))) > 0)`
-- `CONSTRAINT CK_transport_staff_type CHECK`
-- `CONSTRAINT CK_transport_staff_experience CHECK (experience >= 0)`
-- `CONSTRAINT CK_transport_staff_status CHECK (status IN (N'ACTIVE', N'INACTIVE'))`
-- `CONSTRAINT CK_transport_staff_license_expiry CHECK`
-- `CONSTRAINT FK_transport_staff_school FOREIGN KEY (school_id) REFERENCES management_schema.school (school_id)`
-- `CONSTRAINT FK_transport_staff_branch FOREIGN KEY (branch_id) REFERENCES management_schema.branch (branch_id)`
-- `CONSTRAINT FK_transport_staff_user FOREIGN KEY (user_id) REFERENCES security_schema.users (user_id)`
-- `CONSTRAINT FK_transport_staff_created_by FOREIGN KEY (created_by) REFERENCES security_schema.users (user_id)`
-- `CONSTRAINT FK_transport_staff_updated_by FOREIGN KEY (updated_by) REFERENCES security_schema.users (user_id)`
-
-**Indexes**
-
-- `UQ_transport_staff_branch_user`
-- `UQ_transport_staff_branch_license`
-- `IX_transport_staff_branch_type`
-- `IX_transport_staff_mobile`
-
-### `transport_schema.trip`
-
-- **Migration:** `015_transport.sql`
-- **Purpose:** Bus tracking - vehicles, routes, trips, and student transport assignments
-
-| Column | Type | Null | Notes |
-|--------|------|------|-------|
-| `trip_id` | `BIGINT` | NOT NULL |  |
-| `school_id` | `BIGINT` | NOT NULL | School scope FK |
-| `branch_id` | `BIGINT` | NOT NULL | Branch scope FK |
-| `vehicle_id` | `BIGINT` | NOT NULL |  |
-| `vehicle_route_id` | `BIGINT` | NOT NULL |  |
-| `driver_id` | `BIGINT` | NOT NULL |  |
-| `trip_date` | `DATE` | NOT NULL |  |
-| `trip_type` | `NVARCHAR(20)` | NOT NULL |  |
-| `planned_start_time` | `TIME(0)` | NOT NULL |  |
-| `actual_start_at` | `DATETIME2(0)` | NULL |  |
-| `planned_destination_time` | `TIME(0)` | NOT NULL |  |
-| `actual_destination_at` | `DATETIME2(0)` | NULL |  |
-| `delay_minutes` | `SMALLINT` | NULL |  |
-| `status` | `NVARCHAR(20)` | NOT NULL |  |
-| `is_active` | `BIT` | NOT NULL | Soft active flag |
-| `created_at` | `DATETIME2(0)` | NOT NULL | Record created (UTC) |
-| `created_by` | `BIGINT` | NOT NULL | User who created |
-| `updated_at` | `DATETIME2(0)` | NOT NULL | Record last updated (UTC) |
-| `updated_by` | `BIGINT` | NULL | User who last updated |
-| `row_version` | `ROWVERSION` | NOT NULL | Concurrency token |
-
-**Constraints**
-
-- `CONSTRAINT PK_trip PRIMARY KEY CLUSTERED (trip_id)`
-- `CONSTRAINT CK_trip_type CHECK (trip_type IN (N'PICKUP', N'DROP'))`
-- `CONSTRAINT CK_trip_status CHECK`
-- `CONSTRAINT CK_trip_delay CHECK (delay_minutes IS NULL OR delay_minutes >= 0)`
-- `CONSTRAINT CK_trip_time_window CHECK`
-- `CONSTRAINT FK_trip_school FOREIGN KEY (school_id) REFERENCES management_schema.school (school_id)`
-- `CONSTRAINT FK_trip_branch FOREIGN KEY (branch_id) REFERENCES management_schema.branch (branch_id)`
-- `CONSTRAINT FK_trip_vehicle FOREIGN KEY (vehicle_id) REFERENCES transport_schema.vehicle (vehicle_id)`
-- `CONSTRAINT FK_trip_vehicle_route FOREIGN KEY (vehicle_route_id) REFERENCES transport_schema.vehicle_route (vehicle_route_id)`
-- `CONSTRAINT FK_trip_driver FOREIGN KEY (driver_id) REFERENCES transport_schema.staff (staff_id)`
-- `CONSTRAINT FK_trip_created_by FOREIGN KEY (created_by) REFERENCES security_schema.users (user_id)`
-- `CONSTRAINT FK_trip_updated_by FOREIGN KEY (updated_by) REFERENCES security_schema.users (user_id)`
-
-**Indexes**
-
-- `IX_trip_vehicle_date`
-- `IX_trip_route_date`
-- `IX_trip_status_date`
-- `IX_trip_driver_date`
-
-### `transport_schema.trip_stop`
-
-- **Migration:** `015_transport.sql`
-- **Purpose:** Bus tracking - vehicles, routes, trips, and student transport assignments
-
-| Column | Type | Null | Notes |
-|--------|------|------|-------|
-| `trip_stop_id` | `BIGINT` | NOT NULL |  |
-| `trip_id` | `BIGINT` | NOT NULL |  |
-| `vehicle_route_id` | `BIGINT` | NOT NULL |  |
-| `route_stop_id` | `BIGINT` | NOT NULL |  |
-| `stop_sequence` | `SMALLINT` | NOT NULL |  |
-| `planned_arrival_at` | `DATETIME2(0)` | NOT NULL |  |
-| `actual_arrival_at` | `DATETIME2(0)` | NULL |  |
-| `actual_departure_at` | `DATETIME2(0)` | NULL |  |
-| `delay_minutes` | `SMALLINT` | NULL |  |
-| `status` | `NVARCHAR(20)` | NOT NULL |  |
-| `created_at` | `DATETIME2(0)` | NOT NULL | Record created (UTC) |
-| `row_version` | `ROWVERSION` | NOT NULL | Concurrency token |
-
-**Constraints**
-
-- `CONSTRAINT PK_trip_stop PRIMARY KEY CLUSTERED (trip_stop_id)`
-- `CONSTRAINT UQ_trip_stop_trip_sequence UNIQUE NONCLUSTERED (trip_id, stop_sequence)`
-- `CONSTRAINT UQ_trip_stop_trip_route_stop UNIQUE NONCLUSTERED (trip_id, route_stop_id)`
-- `CONSTRAINT CK_trip_stop_sequence CHECK (stop_sequence > 0)`
-- `CONSTRAINT CK_trip_stop_status CHECK`
-- `CONSTRAINT CK_trip_stop_delay CHECK (delay_minutes IS NULL OR delay_minutes >= 0)`
-- `CONSTRAINT CK_trip_stop_actual_time CHECK`
-- `CONSTRAINT FK_trip_stop_trip FOREIGN KEY (trip_id) REFERENCES transport_schema.trip (trip_id)`
-- `CONSTRAINT FK_trip_stop_vehicle_route FOREIGN KEY (vehicle_route_id) REFERENCES transport_schema.vehicle_route (vehicle_route_id)`
-
-**Indexes**
-
-- `IX_trip_stop_trip_sequence`
-- `IX_trip_stop_status_route`
-
-### `transport_schema.vehicle`
-
-- **Migration:** `015_transport.sql`
-- **Purpose:** Bus tracking - vehicles, routes, trips, and student transport assignments
-
-| Column | Type | Null | Notes |
-|--------|------|------|-------|
-| `vehicle_id` | `BIGINT` | NOT NULL |  |
-| `school_id` | `BIGINT` | NOT NULL | School scope FK |
-| `branch_id` | `BIGINT` | NOT NULL | Branch scope FK |
-| `vehicle_number` | `NVARCHAR(30)` | NOT NULL |  |
-| `vehicle_name` | `NVARCHAR(100)` | NULL |  |
-| `capacity` | `INT` | NOT NULL |  |
-| `status` | `NVARCHAR(20)` | NOT NULL |  |
-| `vehicle_health` | `NVARCHAR(30)` | NOT NULL | Vehicle condition: EXCELLENT, GOOD, FAIR, NEEDS_SERVICE, CRITICAL |
-| `is_active` | `BIT` | NOT NULL | Soft active flag |
-| `created_at` | `DATETIME2(0)` | NOT NULL | Record created (UTC) |
-| `created_by` | `BIGINT` | NOT NULL | User who created |
-| `updated_at` | `DATETIME2(0)` | NOT NULL | Record last updated (UTC) |
-| `updated_by` | `BIGINT` | NULL | User who last updated |
-| `row_version` | `ROWVERSION` | NOT NULL | Concurrency token |
-
-**Constraints**
-
-- `CONSTRAINT PK_vehicle PRIMARY KEY CLUSTERED (vehicle_id)`
-- `CONSTRAINT UQ_vehicle_branch_number UNIQUE NONCLUSTERED (branch_id, vehicle_number)`
-- `CONSTRAINT CK_vehicle_number_non_empty CHECK (LEN(LTRIM(RTRIM(vehicle_number))) > 0)`
-- `CONSTRAINT CK_vehicle_name_non_empty CHECK (vehicle_name IS NULL OR LEN(LTRIM(RTRIM(vehicle_name))) > 0)`
-- `CONSTRAINT CK_vehicle_status CHECK (status IN (N'ACTIVE', N'INACTIVE', N'MAINTENANCE'))`
-- `CONSTRAINT CK_transport_vehicle_health CHECK (vehicle_health IN (N'EXCELLENT', N'GOOD', N'FAIR', N'NEEDS_SERVICE', N'CRITICAL'))`
-- `CONSTRAINT CK_vehicle_capacity CHECK (capacity IS NULL OR capacity > 0)`
-- `CONSTRAINT FK_vehicle_school FOREIGN KEY (school_id) REFERENCES management_schema.school (school_id)`
-- `CONSTRAINT FK_vehicle_branch FOREIGN KEY (branch_id) REFERENCES management_schema.branch (branch_id)`
-- `CONSTRAINT FK_vehicle_created_by FOREIGN KEY (created_by) REFERENCES security_schema.users (user_id)`
-- `CONSTRAINT FK_vehicle_updated_by FOREIGN KEY (updated_by) REFERENCES security_schema.users (user_id)`
-
-**Indexes**
-
-- `IX_vehicle_branch_status`
-
-### `transport_schema.vehicle_route`
-
-- **Migration:** `015_transport.sql`
-- **Purpose:** Bus tracking - vehicles, routes, trips, and student transport assignments
-
-| Column | Type | Null | Notes |
-|--------|------|------|-------|
-| `vehicle_route_id` | `BIGINT` | NOT NULL |  |
-| `school_id` | `BIGINT` | NOT NULL | School scope FK |
-| `branch_id` | `BIGINT` | NOT NULL | Branch scope FK |
-| `vehicle_id` | `BIGINT` | NOT NULL |  |
-| `route_code` | `NVARCHAR(30)` | NOT NULL |  |
-| `route_name` | `NVARCHAR(150)` | NOT NULL |  |
-| `route_type` | `NVARCHAR(20)` | NOT NULL |  |
-| `route_stop_id` | `BIGINT` | NOT NULL |  |
-| `stop_sequence` | `SMALLINT` | NOT NULL |  |
-| `stop_name` | `NVARCHAR(150)` | NOT NULL |  |
-| `stop_address` | `NVARCHAR(300)` | NULL |  |
-| `planned_arrival_time` | `TIME(0)` | NOT NULL |  |
-| `planned_departure_time` | `TIME(0)` | NULL |  |
-| `status` | `NVARCHAR(20)` | NOT NULL |  |
-| `effective_from` | `DATE` | NOT NULL |  |
-| `effective_to` | `DATE` | NULL |  |
-| `is_active` | `BIT` | NOT NULL | Soft active flag |
-| `created_at` | `DATETIME2(0)` | NOT NULL | Record created (UTC) |
-| `created_by` | `BIGINT` | NOT NULL | User who created |
-| `updated_at` | `DATETIME2(0)` | NOT NULL | Record last updated (UTC) |
-| `updated_by` | `BIGINT` | NULL | User who last updated |
-| `row_version` | `ROWVERSION` | NOT NULL | Concurrency token |
-
-**Constraints**
-
-- `CONSTRAINT PK_vehicle_route PRIMARY KEY CLUSTERED (vehicle_route_id)`
-- `CONSTRAINT UQ_vehicle_route_branch_stop UNIQUE NONCLUSTERED (branch_id, route_stop_id)`
-- `CONSTRAINT UQ_vehicle_route_stop_order UNIQUE NONCLUSTERED`
-- `CONSTRAINT CK_vehicle_route_code CHECK (LEN(LTRIM(RTRIM(route_code))) > 0)`
-- `CONSTRAINT CK_vehicle_route_name CHECK (LEN(LTRIM(RTRIM(route_name))) > 0)`
-- `CONSTRAINT CK_vehicle_route_type CHECK (route_type IN (N'PICKUP', N'DROP'))`
-- `CONSTRAINT CK_vehicle_route_status CHECK (status IN (N'ACTIVE', N'INACTIVE'))`
-- `CONSTRAINT CK_vehicle_route_stop_id CHECK (route_stop_id > 0)`
-- `CONSTRAINT CK_vehicle_route_stop_sequence CHECK (stop_sequence > 0)`
-- `CONSTRAINT CK_vehicle_route_stop_name CHECK (LEN(LTRIM(RTRIM(stop_name))) > 0)`
-- `CONSTRAINT CK_vehicle_route_dates CHECK`
-- `CONSTRAINT FK_vehicle_route_school FOREIGN KEY (school_id) REFERENCES management_schema.school (school_id)`
-- `CONSTRAINT FK_vehicle_route_branch FOREIGN KEY (branch_id) REFERENCES management_schema.branch (branch_id)`
-- `CONSTRAINT FK_vehicle_route_vehicle FOREIGN KEY (vehicle_id) REFERENCES transport_schema.vehicle (vehicle_id)`
-- `CONSTRAINT FK_vehicle_route_created_by FOREIGN KEY (created_by) REFERENCES security_schema.users (user_id)`
-- `CONSTRAINT FK_vehicle_route_updated_by FOREIGN KEY (updated_by) REFERENCES security_schema.users (user_id)`
-
-**Indexes**
-
-- `IX_vehicle_route_vehicle`
-- `IX_vehicle_route_route_order`
-- `IX_vehicle_route_branch`
-
 ## Appendix: SQL vs MongoDB vs Redis vs Blob
 
-### SQL Server (43 tables)
+### SQL Server (52 tables)
 
 Core ERP: students, teachers, masters, timetable, attendance, exams, assignments, homework, fees, receipts, library, transport, security (auth), leave, grievance, announcements.
 

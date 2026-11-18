@@ -31,6 +31,16 @@ MIGRATION_ORDER = [
     "014_library.sql",
     "015_transport.sql",
     "016_finance.sql",
+    "018_student_achievements.sql",
+    "019_student_residency_and_section_class_teacher.sql",
+    "020_alumni.sql",
+    "021_student_exam_performance.sql",
+    "022_personal_development.sql",
+    "023_cultural_participation.sql",
+    "024_teacher_designation.sql",
+    "025_sports_and_grievance_department.sql",
+    "026_teacher_leave_and_grievance.sql",
+    "027_teacher_attendance.sql",
 ]
 
 COLUMN_HINTS = {

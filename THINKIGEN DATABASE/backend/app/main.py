@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.routers.timetable import router as timetable_router
+from app.routers.teacher_attendance import router as teacher_attendance_router
 
 app = FastAPI(
     title="Thinkigen Academic & Timetable API",
@@ -32,6 +33,7 @@ app.add_middleware(
 )
 
 app.include_router(timetable_router)
+app.include_router(teacher_attendance_router)
 
 
 @app.get("/health", tags=["Health"])

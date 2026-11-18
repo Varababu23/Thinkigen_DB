@@ -13,9 +13,12 @@
         5. trip
         6. trip_stop
         7. speed_measurement
+        8. trip_passenger_attendance
+        9. transport_incident
+        10. transport_incident_history
     - student_schema:
-        8. transport_assignment
-        9. transport_change_request
+        11. transport_assignment
+        12. transport_change_request
 
     Design & Hardening Highlights:
     - Strict cross-entity hierarchy: School -> Branch -> Vehicle -> Route -> Stop -> Trip -> Trip Stop
@@ -25,6 +28,9 @@
     - Trip stop route consistency: trip_stop.route_stop_id belongs to trip.vehicle_route_id and matches stop_sequence
     - Trip driver role enforcement: driver_id must reference staff with staff_type = 'DRIVER'
     - Telemetry integrity: speed_measurement references (trip_id, vehicle_id) matching the trip's vehicle
+    - Live tracking & telemetry coordinates: latitude, longitude, heading, GPS fix validation
+    - Passenger attendance: boarded/drop status and timestamps tied to trips and students
+    - Incident management & lifecycle: active incident recording and decoupled resolved history tracking
     - Change request all-or-none requested stop validation and permanent vs temporary return date integrity
     - Concurrency & Capacity: Stored procedure transport_schema.usp_assign_student_transport with UPDLOCK/HOLDLOCK
     - Dynamic date-dependent CHECK constraints eliminated in favor of deterministic validation
@@ -33,7 +39,10 @@
     Rollback:
     - DROP PROCEDURE IF EXISTS transport_schema.usp_assign_student_transport;
     - DROP TABLE IF EXISTS student_schema.transport_change_request;
+    - DROP TABLE IF EXISTS transport_schema.trip_passenger_attendance;
     - DROP TABLE IF EXISTS student_schema.transport_assignment;
+    - DROP TABLE IF EXISTS transport_schema.transport_incident_history;
+    - DROP TABLE IF EXISTS transport_schema.transport_incident;
     - DROP TABLE IF EXISTS transport_schema.speed_measurement;
     - DROP TABLE IF EXISTS transport_schema.trip_stop;
     - DROP TABLE IF EXISTS transport_schema.trip;
@@ -173,7 +182,10 @@ BEGIN
     PRINT N'Detected legacy transport schema. Upgrading all transport tables to hardened architecture...';
     DROP PROCEDURE IF EXISTS transport_schema.usp_assign_student_transport;
     DROP TABLE IF EXISTS student_schema.transport_change_request;
+    DROP TABLE IF EXISTS transport_schema.trip_passenger_attendance;
     DROP TABLE IF EXISTS student_schema.transport_assignment;
+    DROP TABLE IF EXISTS transport_schema.transport_incident_history;
+    DROP TABLE IF EXISTS transport_schema.transport_incident;
     DROP TABLE IF EXISTS transport_schema.speed_measurement;
     DROP TABLE IF EXISTS transport_schema.trip_stop;
     DROP TABLE IF EXISTS transport_schema.trip;
@@ -394,6 +406,16 @@ CREATE TABLE [transport_schema].[speed_measurement](
 
 	[speed_kmh] [decimal](6, 2) NOT NULL,
 
+	[latitude] [decimal](9, 6) NULL,
+
+	[longitude] [decimal](9, 6) NULL,
+
+	[heading_degrees] [smallint] NULL,
+
+	[gps_fix_status] [nvarchar](20) NOT NULL,
+
+	[received_at] [datetime2](0) NOT NULL,
+
 	[created_at] [datetime2](0) NOT NULL,
 
  CONSTRAINT [PK_speed_measurement] PRIMARY KEY CLUSTERED 
@@ -405,6 +427,22 @@ CREATE TABLE [transport_schema].[speed_measurement](
 )WITH (STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
 
 ) ON [PRIMARY]
+END
+GO
+
+-- Ensure columns exist if table was created in an earlier migration version
+IF OBJECT_ID(N'[transport_schema].[speed_measurement]', N'U') IS NOT NULL
+BEGIN
+    IF COL_LENGTH(N'transport_schema.speed_measurement', N'latitude') IS NULL
+        ALTER TABLE [transport_schema].[speed_measurement] ADD [latitude] [decimal](9, 6) NULL;
+    IF COL_LENGTH(N'transport_schema.speed_measurement', N'longitude') IS NULL
+        ALTER TABLE [transport_schema].[speed_measurement] ADD [longitude] [decimal](9, 6) NULL;
+    IF COL_LENGTH(N'transport_schema.speed_measurement', N'heading_degrees') IS NULL
+        ALTER TABLE [transport_schema].[speed_measurement] ADD [heading_degrees] [smallint] NULL;
+    IF COL_LENGTH(N'transport_schema.speed_measurement', N'gps_fix_status') IS NULL
+        ALTER TABLE [transport_schema].[speed_measurement] ADD [gps_fix_status] [nvarchar](20) NOT NULL CONSTRAINT [DF_speed_measurement_gps_fix_status] DEFAULT (N'NO_FIX');
+    IF COL_LENGTH(N'transport_schema.speed_measurement', N'received_at') IS NULL
+        ALTER TABLE [transport_schema].[speed_measurement] ADD [received_at] [datetime2](0) NOT NULL CONSTRAINT [DF_speed_measurement_received_at] DEFAULT (sysutcdatetime());
 END
 GO
 /****** Object:  Table [transport_schema].[staff]    Script Date: 23-09-2026 04:07:00 ******/
@@ -885,6 +923,124 @@ CREATE TABLE [transport_schema].[vehicle_route_stop](
 ) ON [PRIMARY]
 END
 GO
+
+/****** Object:  Table [transport_schema].[trip_passenger_attendance] ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+IF OBJECT_ID(N'[transport_schema].[trip_passenger_attendance]', N'U') IS NULL
+BEGIN
+CREATE TABLE [transport_schema].[trip_passenger_attendance](
+	[trip_passenger_attendance_id] [bigint] IDENTITY(1,1) NOT NULL,
+	[school_id] [bigint] NOT NULL,
+	[branch_id] [bigint] NOT NULL,
+	[trip_id] [bigint] NOT NULL,
+	[user_id] [bigint] NOT NULL,
+	[transport_assignment_id] [bigint] NULL,
+	[boarded_attendance_status] [nvarchar](20) NULL,
+	[boarded_at] [datetime2](0) NULL,
+	[drop_attendance_status] [nvarchar](20) NULL,
+	[drop_at] [datetime2](0) NULL,
+	[attendance_status] [nvarchar](20) NULL,
+	[recorded_by] [bigint] NULL,
+	[created_at] [datetime2](0) NOT NULL,
+	[created_by] [bigint] NULL,
+	[updated_at] [datetime2](0) NOT NULL,
+	[updated_by] [bigint] NULL,
+	[row_version] [timestamp] NOT NULL,
+ CONSTRAINT [PK_trip_passenger_attendance] PRIMARY KEY CLUSTERED 
+(
+	[trip_passenger_attendance_id] ASC
+)WITH (STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY],
+ CONSTRAINT [UQ_trip_passenger_attendance_trip_user] UNIQUE NONCLUSTERED 
+(
+	[trip_id] ASC,
+	[user_id] ASC
+)WITH (STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+END
+GO
+
+/****** Object:  Table [transport_schema].[transport_incident] ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+IF OBJECT_ID(N'[transport_schema].[transport_incident]', N'U') IS NULL
+BEGIN
+CREATE TABLE [transport_schema].[transport_incident](
+	[transport_incident_id] [bigint] IDENTITY(1,1) NOT NULL,
+	[school_id] [bigint] NOT NULL,
+	[branch_id] [bigint] NOT NULL,
+	[title] [nvarchar](200) NOT NULL,
+	[description] [nvarchar](2000) NULL,
+	[record_type] [nvarchar](30) NOT NULL,
+	[type] [nvarchar](30) NOT NULL,
+	[vehicle_id] [bigint] NULL,
+	[detected_at] [datetime2](0) NOT NULL,
+	[status] [nvarchar](20) NOT NULL,
+	[attachment_url] [nvarchar](1000) NULL,
+	[is_active] [bit] NOT NULL,
+	[created_at] [datetime2](0) NOT NULL,
+	[created_by] [bigint] NOT NULL,
+	[updated_at] [datetime2](0) NOT NULL,
+	[updated_by] [bigint] NULL,
+	[row_version] [timestamp] NOT NULL,
+ CONSTRAINT [PK_transport_incident] PRIMARY KEY CLUSTERED 
+(
+	[transport_incident_id] ASC
+)WITH (STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+END
+GO
+
+-- Ensure attachment_url column exists if table was created in an earlier migration version
+IF OBJECT_ID(N'[transport_schema].[transport_incident]', N'U') IS NOT NULL
+BEGIN
+    IF COL_LENGTH(N'transport_schema.transport_incident', N'attachment_url') IS NULL
+        ALTER TABLE [transport_schema].[transport_incident] ADD [attachment_url] [nvarchar](1000) NULL;
+END
+GO
+
+/****** Object:  Table [transport_schema].[transport_incident_history] ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+IF OBJECT_ID(N'[transport_schema].[transport_incident_history]', N'U') IS NULL
+BEGIN
+CREATE TABLE [transport_schema].[transport_incident_history](
+	[transport_incident_history_id] [bigint] IDENTITY(1,1) NOT NULL,
+	[transport_incident_id] [bigint] NOT NULL,
+	[school_id] [bigint] NOT NULL,
+	[branch_id] [bigint] NOT NULL,
+	[title] [nvarchar](200) NOT NULL,
+	[description] [nvarchar](2000) NULL,
+	[record_type] [nvarchar](30) NOT NULL,
+	[type] [nvarchar](30) NOT NULL,
+	[vehicle_id] [bigint] NULL,
+	[detected_at] [datetime2](0) NOT NULL,
+	[resolved_at] [datetime2](0) NULL,
+	[attachment_url] [nvarchar](1000) NULL,
+	[updated_at] [datetime2](0) NOT NULL,
+	[updated_by] [bigint] NOT NULL,
+	[row_version] [timestamp] NOT NULL,
+ CONSTRAINT [PK_transport_incident_history] PRIMARY KEY CLUSTERED 
+(
+	[transport_incident_history_id] ASC
+)WITH (STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+END
+GO
+
+-- Ensure attachment_url column exists if table was created in an earlier migration version
+IF OBJECT_ID(N'[transport_schema].[transport_incident_history]', N'U') IS NOT NULL
+BEGIN
+    IF COL_LENGTH(N'transport_schema.transport_incident_history', N'attachment_url') IS NULL
+        ALTER TABLE [transport_schema].[transport_incident_history] ADD [attachment_url] [nvarchar](1000) NULL;
+END
+GO
 IF NOT EXISTS (SELECT 1 FROM sys.default_constraints WHERE name = N'DF_transport_assignment_is_active')
 BEGIN
     ALTER TABLE [student_schema].[transport_assignment] ADD  CONSTRAINT [DF_transport_assignment_is_active]  DEFAULT ((1)) FOR [is_active]
@@ -1013,6 +1169,46 @@ GO
 IF NOT EXISTS (SELECT 1 FROM sys.default_constraints WHERE name = N'DF_route_stop_updated_at')
 BEGIN
     ALTER TABLE [transport_schema].[vehicle_route_stop] ADD  CONSTRAINT [DF_route_stop_updated_at]  DEFAULT (sysutcdatetime()) FOR [updated_at]
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.default_constraints WHERE name = N'DF_speed_measurement_gps_fix_status')
+BEGIN
+    ALTER TABLE [transport_schema].[speed_measurement] ADD  CONSTRAINT [DF_speed_measurement_gps_fix_status]  DEFAULT (N'NO_FIX') FOR [gps_fix_status]
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.default_constraints WHERE name = N'DF_speed_measurement_received_at')
+BEGIN
+    ALTER TABLE [transport_schema].[speed_measurement] ADD  CONSTRAINT [DF_speed_measurement_received_at]  DEFAULT (sysutcdatetime()) FOR [received_at]
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.default_constraints WHERE name = N'DF_trip_passenger_attendance_created_at')
+BEGIN
+    ALTER TABLE [transport_schema].[trip_passenger_attendance] ADD  CONSTRAINT [DF_trip_passenger_attendance_created_at]  DEFAULT (sysutcdatetime()) FOR [created_at]
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.default_constraints WHERE name = N'DF_trip_passenger_attendance_updated_at')
+BEGIN
+    ALTER TABLE [transport_schema].[trip_passenger_attendance] ADD  CONSTRAINT [DF_trip_passenger_attendance_updated_at]  DEFAULT (sysutcdatetime()) FOR [updated_at]
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.default_constraints WHERE name = N'DF_transport_incident_is_active')
+BEGIN
+    ALTER TABLE [transport_schema].[transport_incident] ADD  CONSTRAINT [DF_transport_incident_is_active]  DEFAULT ((1)) FOR [is_active]
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.default_constraints WHERE name = N'DF_transport_incident_created_at')
+BEGIN
+    ALTER TABLE [transport_schema].[transport_incident] ADD  CONSTRAINT [DF_transport_incident_created_at]  DEFAULT (sysutcdatetime()) FOR [created_at]
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.default_constraints WHERE name = N'DF_transport_incident_updated_at')
+BEGIN
+    ALTER TABLE [transport_schema].[transport_incident] ADD  CONSTRAINT [DF_transport_incident_updated_at]  DEFAULT (sysutcdatetime()) FOR [updated_at]
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.default_constraints WHERE name = N'DF_transport_incident_history_updated_at')
+BEGIN
+    ALTER TABLE [transport_schema].[transport_incident_history] ADD  CONSTRAINT [DF_transport_incident_history_updated_at]  DEFAULT (sysutcdatetime()) FOR [updated_at]
 END
 GO
 IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_transport_assignment_academic_year')
@@ -1844,6 +2040,215 @@ BEGIN
     ALTER TABLE [transport_schema].[vehicle_route_stop] CHECK CONSTRAINT [FK_route_stop_vehicle_route]
 END
 GO
+-- Foreign Keys: transport_schema.trip_passenger_attendance
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_trip_passenger_attendance_school')
+BEGIN
+    ALTER TABLE [transport_schema].[trip_passenger_attendance]  WITH CHECK ADD  CONSTRAINT [FK_trip_passenger_attendance_school] FOREIGN KEY([school_id])
+    REFERENCES [management_schema].[school] ([school_id])
+END
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE name = N'FK_trip_passenger_attendance_school')
+BEGIN
+    ALTER TABLE [transport_schema].[trip_passenger_attendance] CHECK CONSTRAINT [FK_trip_passenger_attendance_school]
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_trip_passenger_attendance_branch_scope')
+BEGIN
+    ALTER TABLE [transport_schema].[trip_passenger_attendance]  WITH CHECK ADD  CONSTRAINT [FK_trip_passenger_attendance_branch_scope] FOREIGN KEY([school_id], [branch_id])
+    REFERENCES [management_schema].[branch] ([school_id], [branch_id])
+END
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE name = N'FK_trip_passenger_attendance_branch_scope')
+BEGIN
+    ALTER TABLE [transport_schema].[trip_passenger_attendance] CHECK CONSTRAINT [FK_trip_passenger_attendance_branch_scope]
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_trip_passenger_attendance_trip')
+BEGIN
+    ALTER TABLE [transport_schema].[trip_passenger_attendance]  WITH CHECK ADD  CONSTRAINT [FK_trip_passenger_attendance_trip] FOREIGN KEY([trip_id])
+    REFERENCES [transport_schema].[trip] ([trip_id])
+END
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE name = N'FK_trip_passenger_attendance_trip')
+BEGIN
+    ALTER TABLE [transport_schema].[trip_passenger_attendance] CHECK CONSTRAINT [FK_trip_passenger_attendance_trip]
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_trip_passenger_attendance_user')
+BEGIN
+    ALTER TABLE [transport_schema].[trip_passenger_attendance]  WITH CHECK ADD  CONSTRAINT [FK_trip_passenger_attendance_user] FOREIGN KEY([user_id])
+    REFERENCES [security_schema].[users] ([user_id])
+END
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE name = N'FK_trip_passenger_attendance_user')
+BEGIN
+    ALTER TABLE [transport_schema].[trip_passenger_attendance] CHECK CONSTRAINT [FK_trip_passenger_attendance_user]
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_trip_passenger_attendance_assignment')
+BEGIN
+    ALTER TABLE [transport_schema].[trip_passenger_attendance]  WITH CHECK ADD  CONSTRAINT [FK_trip_passenger_attendance_assignment] FOREIGN KEY([transport_assignment_id])
+    REFERENCES [student_schema].[transport_assignment] ([transport_assignment_id])
+END
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE name = N'FK_trip_passenger_attendance_assignment')
+BEGIN
+    ALTER TABLE [transport_schema].[trip_passenger_attendance] CHECK CONSTRAINT [FK_trip_passenger_attendance_assignment]
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_trip_passenger_attendance_recorded_by')
+BEGIN
+    ALTER TABLE [transport_schema].[trip_passenger_attendance]  WITH CHECK ADD  CONSTRAINT [FK_trip_passenger_attendance_recorded_by] FOREIGN KEY([recorded_by])
+    REFERENCES [security_schema].[users] ([user_id])
+END
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE name = N'FK_trip_passenger_attendance_recorded_by')
+BEGIN
+    ALTER TABLE [transport_schema].[trip_passenger_attendance] CHECK CONSTRAINT [FK_trip_passenger_attendance_recorded_by]
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_trip_passenger_attendance_created_by')
+BEGIN
+    ALTER TABLE [transport_schema].[trip_passenger_attendance]  WITH CHECK ADD  CONSTRAINT [FK_trip_passenger_attendance_created_by] FOREIGN KEY([created_by])
+    REFERENCES [security_schema].[users] ([user_id])
+END
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE name = N'FK_trip_passenger_attendance_created_by')
+BEGIN
+    ALTER TABLE [transport_schema].[trip_passenger_attendance] CHECK CONSTRAINT [FK_trip_passenger_attendance_created_by]
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_trip_passenger_attendance_updated_by')
+BEGIN
+    ALTER TABLE [transport_schema].[trip_passenger_attendance]  WITH CHECK ADD  CONSTRAINT [FK_trip_passenger_attendance_updated_by] FOREIGN KEY([updated_by])
+    REFERENCES [security_schema].[users] ([user_id])
+END
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE name = N'FK_trip_passenger_attendance_updated_by')
+BEGIN
+    ALTER TABLE [transport_schema].[trip_passenger_attendance] CHECK CONSTRAINT [FK_trip_passenger_attendance_updated_by]
+END
+GO
+-- Foreign Keys: transport_schema.transport_incident
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_transport_incident_school')
+BEGIN
+    ALTER TABLE [transport_schema].[transport_incident]  WITH CHECK ADD  CONSTRAINT [FK_transport_incident_school] FOREIGN KEY([school_id])
+    REFERENCES [management_schema].[school] ([school_id])
+END
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE name = N'FK_transport_incident_school')
+BEGIN
+    ALTER TABLE [transport_schema].[transport_incident] CHECK CONSTRAINT [FK_transport_incident_school]
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_transport_incident_branch_scope')
+BEGIN
+    ALTER TABLE [transport_schema].[transport_incident]  WITH CHECK ADD  CONSTRAINT [FK_transport_incident_branch_scope] FOREIGN KEY([school_id], [branch_id])
+    REFERENCES [management_schema].[branch] ([school_id], [branch_id])
+END
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE name = N'FK_transport_incident_branch_scope')
+BEGIN
+    ALTER TABLE [transport_schema].[transport_incident] CHECK CONSTRAINT [FK_transport_incident_branch_scope]
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_transport_incident_vehicle')
+BEGIN
+    ALTER TABLE [transport_schema].[transport_incident]  WITH CHECK ADD  CONSTRAINT [FK_transport_incident_vehicle] FOREIGN KEY([vehicle_id])
+    REFERENCES [transport_schema].[vehicle] ([vehicle_id])
+END
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE name = N'FK_transport_incident_vehicle')
+BEGIN
+    ALTER TABLE [transport_schema].[transport_incident] CHECK CONSTRAINT [FK_transport_incident_vehicle]
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_transport_incident_created_by')
+BEGIN
+    ALTER TABLE [transport_schema].[transport_incident]  WITH CHECK ADD  CONSTRAINT [FK_transport_incident_created_by] FOREIGN KEY([created_by])
+    REFERENCES [security_schema].[users] ([user_id])
+END
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE name = N'FK_transport_incident_created_by')
+BEGIN
+    ALTER TABLE [transport_schema].[transport_incident] CHECK CONSTRAINT [FK_transport_incident_created_by]
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_transport_incident_updated_by')
+BEGIN
+    ALTER TABLE [transport_schema].[transport_incident]  WITH CHECK ADD  CONSTRAINT [FK_transport_incident_updated_by] FOREIGN KEY([updated_by])
+    REFERENCES [security_schema].[users] ([user_id])
+END
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE name = N'FK_transport_incident_updated_by')
+BEGIN
+    ALTER TABLE [transport_schema].[transport_incident] CHECK CONSTRAINT [FK_transport_incident_updated_by]
+END
+GO
+-- Foreign Keys: transport_schema.transport_incident_history
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_transport_incident_history_school')
+BEGIN
+    ALTER TABLE [transport_schema].[transport_incident_history]  WITH CHECK ADD  CONSTRAINT [FK_transport_incident_history_school] FOREIGN KEY([school_id])
+    REFERENCES [management_schema].[school] ([school_id])
+END
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE name = N'FK_transport_incident_history_school')
+BEGIN
+    ALTER TABLE [transport_schema].[transport_incident_history] CHECK CONSTRAINT [FK_transport_incident_history_school]
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_transport_incident_history_branch_scope')
+BEGIN
+    ALTER TABLE [transport_schema].[transport_incident_history]  WITH CHECK ADD  CONSTRAINT [FK_transport_incident_history_branch_scope] FOREIGN KEY([school_id], [branch_id])
+    REFERENCES [management_schema].[branch] ([school_id], [branch_id])
+END
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE name = N'FK_transport_incident_history_branch_scope')
+BEGIN
+    ALTER TABLE [transport_schema].[transport_incident_history] CHECK CONSTRAINT [FK_transport_incident_history_branch_scope]
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_transport_incident_history_vehicle')
+BEGIN
+    ALTER TABLE [transport_schema].[transport_incident_history]  WITH CHECK ADD  CONSTRAINT [FK_transport_incident_history_vehicle] FOREIGN KEY([vehicle_id])
+    REFERENCES [transport_schema].[vehicle] ([vehicle_id])
+END
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE name = N'FK_transport_incident_history_vehicle')
+BEGIN
+    ALTER TABLE [transport_schema].[transport_incident_history] CHECK CONSTRAINT [FK_transport_incident_history_vehicle]
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_transport_incident_history_updated_by')
+BEGIN
+    ALTER TABLE [transport_schema].[transport_incident_history]  WITH CHECK ADD  CONSTRAINT [FK_transport_incident_history_updated_by] FOREIGN KEY([updated_by])
+    REFERENCES [security_schema].[users] ([user_id])
+END
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE name = N'FK_transport_incident_history_updated_by')
+BEGIN
+    ALTER TABLE [transport_schema].[transport_incident_history] CHECK CONSTRAINT [FK_transport_incident_history_updated_by]
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_transport_incident_history_incident')
+BEGIN
+    DELETE h
+    FROM [transport_schema].[transport_incident_history] h
+    WHERE NOT EXISTS (
+        SELECT 1
+        FROM [transport_schema].[transport_incident] i
+        WHERE i.transport_incident_id = h.transport_incident_id
+    );
+
+    ALTER TABLE [transport_schema].[transport_incident_history]  WITH CHECK ADD  CONSTRAINT [FK_transport_incident_history_incident] FOREIGN KEY([transport_incident_id])
+    REFERENCES [transport_schema].[transport_incident] ([transport_incident_id])
+END
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE name = N'FK_transport_incident_history_incident')
+BEGIN
+    ALTER TABLE [transport_schema].[transport_incident_history] CHECK CONSTRAINT [FK_transport_incident_history_incident]
+END
+GO
 IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = N'CK_transport_assignment_dates')
 BEGIN
     ALTER TABLE [student_schema].[transport_assignment]  WITH CHECK ADD  CONSTRAINT [CK_transport_assignment_dates] CHECK  (([effective_to] IS NULL OR [effective_to]>=[effective_from]))
@@ -1982,6 +2387,66 @@ GO
 IF EXISTS (SELECT 1 FROM sys.objects WHERE name = N'CK_speed_measurement_speed')
 BEGIN
     ALTER TABLE [transport_schema].[speed_measurement] CHECK CONSTRAINT [CK_speed_measurement_speed]
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = N'CK_speed_measurement_latitude')
+BEGIN
+    ALTER TABLE [transport_schema].[speed_measurement]  WITH CHECK ADD  CONSTRAINT [CK_speed_measurement_latitude] CHECK  (([latitude] IS NULL OR [latitude] BETWEEN -90.000000 AND 90.000000))
+END
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE name = N'CK_speed_measurement_latitude')
+BEGIN
+    ALTER TABLE [transport_schema].[speed_measurement] CHECK CONSTRAINT [CK_speed_measurement_latitude]
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = N'CK_speed_measurement_longitude')
+BEGIN
+    ALTER TABLE [transport_schema].[speed_measurement]  WITH CHECK ADD  CONSTRAINT [CK_speed_measurement_longitude] CHECK  (([longitude] IS NULL OR [longitude] BETWEEN -180.000000 AND 180.000000))
+END
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE name = N'CK_speed_measurement_longitude')
+BEGIN
+    ALTER TABLE [transport_schema].[speed_measurement] CHECK CONSTRAINT [CK_speed_measurement_longitude]
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = N'CK_speed_measurement_coordinates')
+BEGIN
+    ALTER TABLE [transport_schema].[speed_measurement]  WITH CHECK ADD  CONSTRAINT [CK_speed_measurement_coordinates] CHECK  (([latitude] IS NULL AND [longitude] IS NULL) OR ([latitude] IS NOT NULL AND [longitude] IS NOT NULL))
+END
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE name = N'CK_speed_measurement_coordinates')
+BEGIN
+    ALTER TABLE [transport_schema].[speed_measurement] CHECK CONSTRAINT [CK_speed_measurement_coordinates]
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = N'CK_speed_measurement_heading')
+BEGIN
+    ALTER TABLE [transport_schema].[speed_measurement]  WITH CHECK ADD  CONSTRAINT [CK_speed_measurement_heading] CHECK  (([heading_degrees] IS NULL OR [heading_degrees] BETWEEN 0 AND 359))
+END
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE name = N'CK_speed_measurement_heading')
+BEGIN
+    ALTER TABLE [transport_schema].[speed_measurement] CHECK CONSTRAINT [CK_speed_measurement_heading]
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = N'CK_speed_measurement_gps_status')
+BEGIN
+    ALTER TABLE [transport_schema].[speed_measurement]  WITH CHECK ADD  CONSTRAINT [CK_speed_measurement_gps_status] CHECK  (([gps_fix_status] IN (N'VALID', N'NO_FIX', N'INVALID')))
+END
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE name = N'CK_speed_measurement_gps_status')
+BEGIN
+    ALTER TABLE [transport_schema].[speed_measurement] CHECK CONSTRAINT [CK_speed_measurement_gps_status]
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = N'CK_speed_measurement_valid_coordinates')
+BEGIN
+    ALTER TABLE [transport_schema].[speed_measurement]  WITH CHECK ADD  CONSTRAINT [CK_speed_measurement_valid_coordinates] CHECK  (([gps_fix_status] <> N'VALID' OR ([latitude] IS NOT NULL AND [longitude] IS NOT NULL)))
+END
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE name = N'CK_speed_measurement_valid_coordinates')
+BEGIN
+    ALTER TABLE [transport_schema].[speed_measurement] CHECK CONSTRAINT [CK_speed_measurement_valid_coordinates]
 END
 GO
 IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = N'CK_transport_staff_license_date')
@@ -2254,6 +2719,119 @@ BEGIN
     ALTER TABLE [transport_schema].[vehicle_route_stop] CHECK CONSTRAINT [CK_route_stop_sequence]
 END
 GO
+-- Check Constraints: transport_schema.trip_passenger_attendance
+IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = N'CK_trip_passenger_attendance_boarded_status')
+BEGIN
+    ALTER TABLE [transport_schema].[trip_passenger_attendance]  WITH CHECK ADD  CONSTRAINT [CK_trip_passenger_attendance_boarded_status] CHECK  (([boarded_attendance_status] IS NULL OR [boarded_attendance_status] IN (N'BOARDED', N'NOT BOARDED', N'NOT TRAVELLING')))
+END
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE name = N'CK_trip_passenger_attendance_boarded_status')
+BEGIN
+    ALTER TABLE [transport_schema].[trip_passenger_attendance] CHECK CONSTRAINT [CK_trip_passenger_attendance_boarded_status]
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = N'CK_trip_passenger_attendance_drop_status')
+BEGIN
+    ALTER TABLE [transport_schema].[trip_passenger_attendance]  WITH CHECK ADD  CONSTRAINT [CK_trip_passenger_attendance_drop_status] CHECK  (([drop_attendance_status] IS NULL OR [drop_attendance_status] IN (N'DROPPED', N'NOT DROPPED', N'NOT TRAVELLING')))
+END
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE name = N'CK_trip_passenger_attendance_drop_status')
+BEGIN
+    ALTER TABLE [transport_schema].[trip_passenger_attendance] CHECK CONSTRAINT [CK_trip_passenger_attendance_drop_status]
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = N'CK_trip_passenger_attendance_status')
+BEGIN
+    ALTER TABLE [transport_schema].[trip_passenger_attendance]  WITH CHECK ADD  CONSTRAINT [CK_trip_passenger_attendance_status] CHECK  (([attendance_status] IS NULL OR [attendance_status] IN (N'BOARDED', N'NOT BOARDED', N'NOT TRAVELLING', N'DROPPED', N'NOT DROPPED', N'ABSENT')))
+END
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE name = N'CK_trip_passenger_attendance_status')
+BEGIN
+    ALTER TABLE [transport_schema].[trip_passenger_attendance] CHECK CONSTRAINT [CK_trip_passenger_attendance_status]
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = N'CK_trip_passenger_attendance_boarded_time')
+BEGIN
+    ALTER TABLE [transport_schema].[trip_passenger_attendance]  WITH CHECK ADD  CONSTRAINT [CK_trip_passenger_attendance_boarded_time] CHECK  (([boarded_at] IS NULL OR [boarded_attendance_status] = N'BOARDED'))
+END
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE name = N'CK_trip_passenger_attendance_boarded_time')
+BEGIN
+    ALTER TABLE [transport_schema].[trip_passenger_attendance] CHECK CONSTRAINT [CK_trip_passenger_attendance_boarded_time]
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = N'CK_trip_passenger_attendance_drop_time')
+BEGIN
+    ALTER TABLE [transport_schema].[trip_passenger_attendance]  WITH CHECK ADD  CONSTRAINT [CK_trip_passenger_attendance_drop_time] CHECK  (([drop_at] IS NULL OR [drop_attendance_status] = N'DROPPED'))
+END
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE name = N'CK_trip_passenger_attendance_drop_time')
+BEGIN
+    ALTER TABLE [transport_schema].[trip_passenger_attendance] CHECK CONSTRAINT [CK_trip_passenger_attendance_drop_time]
+END
+GO
+-- Check Constraints: transport_schema.transport_incident
+IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = N'CK_transport_incident_record_type')
+BEGIN
+    ALTER TABLE [transport_schema].[transport_incident]  WITH CHECK ADD  CONSTRAINT [CK_transport_incident_record_type] CHECK  (([record_type] IN (N'INCIDENT', N'AUTOMATED_ALERT')))
+END
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE name = N'CK_transport_incident_record_type')
+BEGIN
+    ALTER TABLE [transport_schema].[transport_incident] CHECK CONSTRAINT [CK_transport_incident_record_type]
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = N'CK_transport_incident_status')
+BEGIN
+    ALTER TABLE [transport_schema].[transport_incident]  WITH CHECK ADD  CONSTRAINT [CK_transport_incident_status] CHECK  (([status] IN (N'NEW', N'IN_PROGRESS', N'RESOLVED', N'CLOSED', N'CANCELLED')))
+END
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE name = N'CK_transport_incident_status')
+BEGIN
+    ALTER TABLE [transport_schema].[transport_incident] CHECK CONSTRAINT [CK_transport_incident_status]
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = N'CK_transport_incident_title')
+BEGIN
+    ALTER TABLE [transport_schema].[transport_incident]  WITH CHECK ADD  CONSTRAINT [CK_transport_incident_title] CHECK  ((LEN(LTRIM(RTRIM([title]))) > (0)))
+END
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE name = N'CK_transport_incident_title')
+BEGIN
+    ALTER TABLE [transport_schema].[transport_incident] CHECK CONSTRAINT [CK_transport_incident_title]
+END
+GO
+-- Check Constraints: transport_schema.transport_incident_history
+IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = N'CK_transport_incident_history_record_type')
+BEGIN
+    ALTER TABLE [transport_schema].[transport_incident_history]  WITH CHECK ADD  CONSTRAINT [CK_transport_incident_history_record_type] CHECK  (([record_type] IN (N'INCIDENT', N'AUTOMATED_ALERT')))
+END
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE name = N'CK_transport_incident_history_record_type')
+BEGIN
+    ALTER TABLE [transport_schema].[transport_incident_history] CHECK CONSTRAINT [CK_transport_incident_history_record_type]
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = N'CK_transport_incident_history_title')
+BEGIN
+    ALTER TABLE [transport_schema].[transport_incident_history]  WITH CHECK ADD  CONSTRAINT [CK_transport_incident_history_title] CHECK  ((LEN(LTRIM(RTRIM([title]))) > (0)))
+END
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE name = N'CK_transport_incident_history_title')
+BEGIN
+    ALTER TABLE [transport_schema].[transport_incident_history] CHECK CONSTRAINT [CK_transport_incident_history_title]
+END
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = N'CK_transport_incident_history_resolved_time')
+BEGIN
+    ALTER TABLE [transport_schema].[transport_incident_history]  WITH CHECK ADD  CONSTRAINT [CK_transport_incident_history_resolved_time] CHECK  (([resolved_at] IS NULL OR [resolved_at] >= [detected_at]))
+END
+GO
+IF EXISTS (SELECT 1 FROM sys.objects WHERE name = N'CK_transport_incident_history_resolved_time')
+BEGIN
+    ALTER TABLE [transport_schema].[transport_incident_history] CHECK CONSTRAINT [CK_transport_incident_history_resolved_time]
+END
+GO
 
 /* ============================================================================= */
 /* 2. OPERATIONAL & FILTERED PERFORMANCE INDEXES                                */
@@ -2387,6 +2965,18 @@ BEGIN
 END;
 GO
 
+IF EXISTS (
+    SELECT 1 FROM sys.indexes i
+    INNER JOIN sys.index_columns ic ON i.object_id = ic.object_id AND i.index_id = ic.index_id
+    WHERE i.name = N'IX_speed_measurement_trip_recorded'
+      AND i.object_id = OBJECT_ID(N'transport_schema.speed_measurement')
+      AND ic.is_descending_key = 0
+      AND ic.column_id = COLUMNPROPERTY(OBJECT_ID(N'transport_schema.speed_measurement'), 'recorded_at', 'ColumnId')
+)
+BEGIN
+    DROP INDEX IX_speed_measurement_trip_recorded ON transport_schema.speed_measurement;
+END;
+GO
 IF NOT EXISTS (
     SELECT 1 FROM sys.indexes
     WHERE name = N'IX_speed_measurement_trip_recorded'
@@ -2394,10 +2984,22 @@ IF NOT EXISTS (
 )
 BEGIN
     CREATE NONCLUSTERED INDEX IX_speed_measurement_trip_recorded
-        ON transport_schema.speed_measurement (trip_id, recorded_at);
+        ON transport_schema.speed_measurement (trip_id ASC, recorded_at DESC);
 END;
 GO
 
+IF EXISTS (
+    SELECT 1 FROM sys.indexes i
+    INNER JOIN sys.index_columns ic ON i.object_id = ic.object_id AND i.index_id = ic.index_id
+    WHERE i.name = N'IX_speed_measurement_vehicle_recorded'
+      AND i.object_id = OBJECT_ID(N'transport_schema.speed_measurement')
+      AND ic.is_descending_key = 0
+      AND ic.column_id = COLUMNPROPERTY(OBJECT_ID(N'transport_schema.speed_measurement'), 'recorded_at', 'ColumnId')
+)
+BEGIN
+    DROP INDEX IX_speed_measurement_vehicle_recorded ON transport_schema.speed_measurement;
+END;
+GO
 IF NOT EXISTS (
     SELECT 1 FROM sys.indexes
     WHERE name = N'IX_speed_measurement_vehicle_recorded'
@@ -2405,7 +3007,7 @@ IF NOT EXISTS (
 )
 BEGIN
     CREATE NONCLUSTERED INDEX IX_speed_measurement_vehicle_recorded
-        ON transport_schema.speed_measurement (vehicle_id, recorded_at);
+        ON transport_schema.speed_measurement (vehicle_id ASC, recorded_at DESC);
 END;
 GO
 
@@ -2492,6 +3094,101 @@ BEGIN
     CREATE NONCLUSTERED INDEX IX_transport_change_request_assignment
         ON student_schema.transport_change_request (transport_assignment_id)
         WHERE transport_assignment_id IS NOT NULL;
+END;
+GO
+
+-- Performance Indexes: transport_schema.trip_passenger_attendance
+IF NOT EXISTS (
+    SELECT 1 FROM sys.indexes
+    WHERE name = N'IX_trip_passenger_attendance_school_branch'
+      AND object_id = OBJECT_ID(N'transport_schema.trip_passenger_attendance')
+)
+BEGIN
+    CREATE NONCLUSTERED INDEX IX_trip_passenger_attendance_school_branch
+        ON transport_schema.trip_passenger_attendance (school_id, branch_id, trip_id);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT 1 FROM sys.indexes
+    WHERE name = N'IX_trip_passenger_attendance_user'
+      AND object_id = OBJECT_ID(N'transport_schema.trip_passenger_attendance')
+)
+BEGIN
+    CREATE NONCLUSTERED INDEX IX_trip_passenger_attendance_user
+        ON transport_schema.trip_passenger_attendance (user_id, attendance_status);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT 1 FROM sys.indexes
+    WHERE name = N'IX_trip_passenger_attendance_assignment'
+      AND object_id = OBJECT_ID(N'transport_schema.trip_passenger_attendance')
+)
+BEGIN
+    CREATE NONCLUSTERED INDEX IX_trip_passenger_attendance_assignment
+        ON transport_schema.trip_passenger_attendance (transport_assignment_id)
+        WHERE transport_assignment_id IS NOT NULL;
+END;
+GO
+
+-- Performance Indexes: transport_schema.transport_incident
+IF NOT EXISTS (
+    SELECT 1 FROM sys.indexes
+    WHERE name = N'IX_transport_incident_school_branch_status'
+      AND object_id = OBJECT_ID(N'transport_schema.transport_incident')
+)
+BEGIN
+    CREATE NONCLUSTERED INDEX IX_transport_incident_school_branch_status
+        ON transport_schema.transport_incident (school_id, branch_id, status, is_active)
+        INCLUDE (title, detected_at, vehicle_id);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT 1 FROM sys.indexes
+    WHERE name = N'IX_transport_incident_vehicle'
+      AND object_id = OBJECT_ID(N'transport_schema.transport_incident')
+)
+BEGIN
+    CREATE NONCLUSTERED INDEX IX_transport_incident_vehicle
+        ON transport_schema.transport_incident (vehicle_id, detected_at DESC)
+        WHERE vehicle_id IS NOT NULL;
+END;
+GO
+
+-- Performance Indexes: transport_schema.transport_incident_history
+IF NOT EXISTS (
+    SELECT 1 FROM sys.indexes
+    WHERE name = N'IX_transport_incident_history_incident'
+      AND object_id = OBJECT_ID(N'transport_schema.transport_incident_history')
+)
+BEGIN
+    CREATE NONCLUSTERED INDEX IX_transport_incident_history_incident
+        ON transport_schema.transport_incident_history (transport_incident_id);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT 1 FROM sys.indexes
+    WHERE name = N'IX_transport_incident_history_school_branch'
+      AND object_id = OBJECT_ID(N'transport_schema.transport_incident_history')
+)
+BEGIN
+    CREATE NONCLUSTERED INDEX IX_transport_incident_history_school_branch
+        ON transport_schema.transport_incident_history (school_id, branch_id, detected_at DESC);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT 1 FROM sys.indexes
+    WHERE name = N'IX_transport_incident_history_vehicle'
+      AND object_id = OBJECT_ID(N'transport_schema.transport_incident_history')
+)
+BEGIN
+    CREATE NONCLUSTERED INDEX IX_transport_incident_history_vehicle
+        ON transport_schema.transport_incident_history (vehicle_id, detected_at DESC)
+        WHERE vehicle_id IS NOT NULL;
 END;
 GO
 

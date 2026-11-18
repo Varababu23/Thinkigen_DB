@@ -28,7 +28,9 @@ $migrationOrder = @(
     '022_personal_development.sql',
     '023_cultural_participation.sql',
     '024_teacher_designation.sql',
-    '025_sports_and_grievance_department.sql'
+    '025_sports_and_grievance_department.sql',
+    '026_teacher_leave_and_grievance.sql',
+    '027_teacher_attendance.sql'
 )
 
 $header = @'
@@ -36,7 +38,7 @@ $header = @'
     THINKIGEN ERP - Full SQL Server Schema
     Paste this entire file into SSMS and execute it as one query.
 
-    Includes all 25 schema migrations and creates all application tables across 9 schemas.
+    Includes all 27 schema migrations and creates all application tables across 9 schemas.
     This script is idempotent: existing tables and indexes are preserved.
     It does not create a database or insert seed data.
 */

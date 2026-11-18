@@ -37,6 +37,9 @@ SQL BIGINT IDs must be stored as `NumberLong` in Mongo.
 | Connect | `connect_community_poll_vote` | `019_connect_community_poll_vote.js` |
 | Auth | `user_jwt_token` | `020_user_jwt_token.js` |
 | Shared Documents | `thinkigen_documents` | `023_thinkigen_documents.js` |
+| Teacher Portal | `teacher_daily_progress_checklist` | `026_teacher_daily_progress_checklist.js` |
+| Teacher Portal | `student_subject_attentions` | `027_student_subject_attentions.js` |
+| Teacher Portal | `lesson_plan_documents` | `028_lesson_plan_documents.js` |
 | Career Explorer | `career_industries` | `025_career_explorer.js` |
 | Career Explorer | `career_paths` | `025_career_explorer.js` |
 | Other | `024_connect_community_production_hardening` | `024_connect_community_production_hardening.js` |

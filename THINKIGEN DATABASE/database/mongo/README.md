@@ -63,6 +63,7 @@ Scoped per faculty and student to deliver high-performance teacher dashboard exp
 |------------|---------|
 | `teacher_daily_progress_checklist` | Teacher daily productivity snapshot: previous day completion metrics, scheduled period checklist items (ATTENDANCE, HOMEWORK_REVIEW, MEETING, RESOURCE_UPLOAD, ASSESSMENT_EVALUATION, CLASSWORK, OTHER), student scopes (ENTIRE_SECTION, GROUP), and atomic item completion. |
 | `student_subject_attentions` | Subject-level academic health and attention alerts: LOW_ASSESSMENT_SCORE, PENDING_HOMEWORK, and ABSENT_ATTENDANCE with assigned teachers, active alert counts, and status lifecycle (ACTIVE, ACKNOWLEDGED, RESOLVED, EXCUSED). |
+| `lesson_plan_documents` | Specialized metadata registry for teacher lesson plan attachments, resources, references, and media stored in AWS S3 with strict curriculum syllabus scoping (class, section, subject, chapter, topic). |
 
 ### Schema Migration & Int32 Upgrade
 To upgrade all IDs in existing documents from `long` to 32-bit `int` (`NumberInt`) and enforce strict schema validators:
@@ -96,6 +97,25 @@ To seed realistic mock data matching SQL Server timetable dates and IDs:
 mongosh Thinkigen database/mongo/scripts/028_insert_teacher_daily_progress_and_attentions_mock_data.js
 ```
 *Note: Enforces strict temporal constraint—only past instructional dates (October 2026, <= 2026-10-30). Zero future dates.*
+
+### Lesson Plan Documents Management (Production Deployment & Verification)
+To deploy, migrate, index, and verify the `lesson_plan_documents` collection:
+```bash
+# 1. Zero-downtime deployment and backward-compatibility migration
+mongosh Thinkigen database/mongo/scripts/035_migrate_lesson_plan_documents.js
+
+# 2. Reconcile and verify all 12 production indexes
+mongosh Thinkigen database/mongo/scripts/032_create_and_verify_lesson_plan_documents_indexes.js
+
+# 3. Seed compliant sample documents (Science, Math, and Class-wide)
+mongosh Thinkigen database/mongo/scripts/033_insert_sample_lesson_plan_documents.js
+
+# 4. Execute production query patterns test
+mongosh Thinkigen database/mongo/scripts/034_query_reference_lesson_plan_documents.js
+```
+*Documentation & Integration Contracts:*
+- Schema & Field Dictionary: [database/docs/lesson-plan-documents.md](../docs/lesson-plan-documents.md)
+- FastAPI Integration Contract: [database/docs/lesson-plan-fastapi-integration-contract.md](../docs/lesson-plan-fastapi-integration-contract.md)
 
 ## Shared documents
 
@@ -148,6 +168,9 @@ load("database/mongo/collections/018_connect_community_poll.js");
 load("database/mongo/collections/019_connect_community_poll_vote.js");
 load("database/mongo/collections/020_user_jwt_token.js");
 load("database/mongo/collections/023_thinkigen_documents.js");
+load("database/mongo/collections/026_teacher_daily_progress_checklist.js");
+load("database/mongo/collections/027_student_subject_attentions.js");
+load("database/mongo/collections/028_lesson_plan_documents.js");
 ```
 
 Or run each file in `mongosh` against the Organization database.
