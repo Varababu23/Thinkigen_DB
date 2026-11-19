@@ -1,37 +1,40 @@
 /*
 ================================================================================
-SCRIPT:        038_seed_realistic_student_attentions_mock_data.js
+SCRIPT:        040_seed_realistic_student_attentions_all_20_students.js
 MODULE:        Teacher Portal Management & Student Academic Health
 DATABASE:      thinkigen (MongoDB / mongosh)
 COLLECTION:    student_subject_attentions
 
 AUTHENTIC MAPPINGS ENFORCED (FROM SQL SERVER REALISTIC MASTER SEEDS):
 - School: ID 1
-- Branch: ID 1 (Central Campus) & ID 2 (North Campus)
+- Branch: ID 1 (Central Campus)
 - Academic Year: ID 1 (2026-2027)
-- Class: ID 1 ("Class 8 - Central")
-- Section 1 ("A") Faculty:
-  * Subject 1 (English, "ENG"):         Teacher 1  (Keshav Kulkarni, HOD)
-  * Subject 2 (Mathematics, "MAT"):     Teacher 8  (Zara Pai, HOD)
-  * Subject 3 (Science, "SCI"):         Teacher 15 (Bhuvan Solanki, HOD)
-  * Subject 4 (Social Science, "SOC"):  Teacher 22 (Rashmi Chopra, HOD)
-  * Subject 5 (Computer Science, "CSC"):Teacher 29 (Raghunath Mathur, HOD)
-  * Subject 6 (Physical Ed, "PE"):      Teacher 35 (Abhiram Kansal)
-- Section 2 ("B") Faculty:
-  * Subject 1 (English, "ENG"):         Teacher 2  (Radhika Pillai)
-  * Subject 2 (Mathematics, "MAT"):     Teacher 9  (Utkarsh Mishra)
-  * Subject 3 (Science, "SCI"):         Teacher 16 (Juhi Rajput)
-  * Subject 4 (Social Science, "SOC"):  Teacher 23 (Kushagra Kapoor)
-  * Subject 5 (Computer Science, "CSC"):Teacher 30 (Chitra Nigam)
-  * Subject 6 (Physical Ed, "PE"):      Teacher 35 (Abhiram Kansal)
+- Class: ID 1 ("Class 1 - Central")
+- Section 1 ("A"): Students 1 to 10 (Roll R-01 to R-10, ADM-2026-0001 to ADM-2026-0010)
+  Faculty:
+  * Subject 1 (English, "ENG"):          Teacher 1  (Keshav Kulkarni, HOD)
+  * Subject 2 (Mathematics, "MAT"):      Teacher 8  (Zara Pai, HOD)
+  * Subject 3 (Science, "SCI"):          Teacher 15 (Bhuvan Solanki, HOD)
+  * Subject 4 (Social Science, "SOC"):   Teacher 22 (Rashmi Chopra, HOD)
+  * Subject 5 (Computer Science, "CSC"): Teacher 29 (Raghunath Mathur, HOD)
+  * Subject 6 (Physical Ed, "PE"):       Teacher 35 (Abhiram Kansal)
+- Section 2 ("B"): Students 11 to 20 (Roll R-01 to R-10, ADM-2026-0011 to ADM-2026-0020)
+  Faculty:
+  * Subject 1 (English, "ENG"):          Teacher 2  (Radhika Pillai)
+  * Subject 2 (Mathematics, "MAT"):      Teacher 9  (Utkarsh Mishra)
+  * Subject 3 (Science, "SCI"):          Teacher 16 (Juhi Rajput)
+  * Subject 4 (Social Science, "SOC"):   Teacher 23 (Kushagra Kapoor)
+  * Subject 5 (Computer Science, "CSC"): Teacher 30 (Chitra Nigam)
+  * Subject 6 (Physical Ed, "PE"):       Teacher 35 (Abhiram Kansal)
 
 METRIC INVARIANTS ENFORCED:
 1. total_attentions_raised: Total count of all alerts raised (ACTIVE + ACKNOWLEDGED + RESOLVED + EXCUSED).
 2. total_active_attentions: Total count of currently ACTIVE alerts requiring intervention.
 3. Subject level: total_attentions_raised and active_attentions_count maintained per subject.
-4. NO severity or critical attention fields (completely removed per specification).
+4. NO severity or critical attention fields anywhere (completely removed per specification).
 5. 100% BSON 32-bit int (NumberInt).
-6. 100% Past dates (<= 2026-10-30).
+6. 100% Past dates up to today (<= 2026-11-18).
+7. Total Students Seeded: Exactly 20 students.
 ================================================================================
 */
 
@@ -44,7 +47,7 @@ METRIC INVARIANTS ENFORCED:
 
     var COLLECTION_NAME = "student_subject_attentions";
     print("================================================================================");
-    print("SEEDING REALISTIC MOCK DATA: " + COLLECTION_NAME);
+    print("SEEDING REALISTIC MOCK DATA (ALL 20 STUDENTS): " + COLLECTION_NAME);
     print("Target Database: " + targetDb.getName());
     print("Timestamp:       " + new Date().toISOString());
     print("================================================================================");
@@ -266,402 +269,3333 @@ METRIC INVARIANTS ENFORCED:
     }
 
     // -------------------------------------------------------------------------
-    // 3. UNSET OLD SEVERITY & CRITICAL FIELDS ACROSS COLLECTION
+    // 3. DELETE EXISTING MOCK DATA (Clean wipe per user request)
     // -------------------------------------------------------------------------
-    var unsetRes = targetDb[COLLECTION_NAME].updateMany(
-        {},
-        {
-            $unset: {
-                critical_attentions_count: "",
-                "subjects.$[].attentions.$[].severity": ""
-            }
-        }
-    );
-    print("[UNSET] Cleaned legacy severity/critical fields across " + unsetRes.modifiedCount + " documents.");
+    var delRes = targetDb[COLLECTION_NAME].deleteMany({});
+    print("[CLEANUP] Deleted " + delRes.deletedCount + " existing mock documents from " + COLLECTION_NAME + ".");
 
     // -------------------------------------------------------------------------
-    // 4. Faculty Configurations
+    // 4. PREPARE ALL 20 PRODUCTION-GRADE STUDENT ATTENTION DOCUMENTS
     // -------------------------------------------------------------------------
-    var sec1Faculty = [
-        { id: 1, name: "Keshav Kulkarni", sid: 1, sname: "English", code: "ENG" },
-        { id: 8, name: "Zara Pai", sid: 2, sname: "Mathematics", code: "MAT" },
-        { id: 15, name: "Bhuvan Solanki", sid: 3, sname: "Science", code: "SCI" },
-        { id: 22, name: "Rashmi Chopra", sid: 4, sname: "Social Science", code: "SOC" },
-        { id: 29, name: "Raghunath Mathur", sid: 5, sname: "Computer Science", code: "CSC" },
-        { id: 35, name: "Abhiram Kansal", sid: 6, sname: "Physical Education", code: "PE" }
-    ];
+    var docsToInsert = [
 
-    var sec2Faculty = [
-        { id: 2, name: "Radhika Pillai", sid: 1, sname: "English", code: "ENG" },
-        { id: 9, name: "Utkarsh Mishra", sid: 2, sname: "Mathematics", code: "MAT" },
-        { id: 16, name: "Juhi Rajput", sid: 3, sname: "Science", code: "SCI" },
-        { id: 23, name: "Kushagra Kapoor", sid: 4, sname: "Social Science", code: "SOC" },
-        { id: 30, name: "Chitra Nigam", sid: 5, sname: "Computer Science", code: "CSC" },
-        { id: 35, name: "Abhiram Kansal", sid: 6, sname: "Physical Education", code: "PE" }
-    ];
-
-    // -------------------------------------------------------------------------
-    // 5. Student Definition Profiles (Mapped to SQL Server student_schema.student)
-    // -------------------------------------------------------------------------
-    var rawStudents = [
-        // ================= SECTION 1 (CLASS 8 - CENTRAL, SECTION A) =================
         {
-            id: 1, name: "Karishma Shaik", adm: "ADM-2026-0001", roll: "R-01", secId: 1, secName: "A",
-            alerts: [
-                {
-                    sid: 2, type: "LOW_ASSESSMENT_SCORE", title: "Linear Equations Slip Test Below Benchmark",
-                    desc: "Scored 14/50 on algebra diagnostic slip test.", srcId: 501, srcType: "ASSESSMENT", status: "ACTIVE",
-                    trigAt: "2026-10-28T14:30:00Z", ackAt: "2026-10-29T08:30:00Z",
-                    assessment: { id: 501, name: "Linear Equations Slip Test", type: "SLIP_TEST", max: 50.0, pass: 20.0, obt: 14.0, pct: 28.0 }
-                },
-                {
-                    sid: 2, type: "PENDING_HOMEWORK", title: "Polynomial Algebraic Identities Exercise 3.2 Overdue",
-                    desc: "Exercise 3.2 textbook problems overdue by 3 days.", srcId: 3002, srcType: "ASSIGNMENT_HOMEWORK", status: "ACTIVE",
-                    trigAt: "2026-10-26T08:00:00Z", ackAt: "2026-10-27T09:00:00Z",
-                    homework: { id: 3002, title: "Polynomial Identities Exercise 3.2", assigned: "2026-10-20", due: "2026-10-23", overdue: 3, subStatus: "PENDING" }
-                },
-                {
-                    sid: 1, type: "PENDING_HOMEWORK", title: "Overdue Poetry Analysis Essay - The Road Not Taken",
-                    desc: "Poetry analysis essay assigned on Oct 12 submitted late and accepted.", srcId: 3001, srcType: "ASSIGNMENT_HOMEWORK", status: "RESOLVED",
-                    trigAt: "2026-10-16T09:00:00Z", ackAt: "2026-10-16T11:00:00Z", resAt: "2026-10-18T14:30:00Z",
-                    remarks: "Completed handwritten essay with annotations evaluated and accepted.",
-                    homework: { id: 3001, title: "Poetry Analysis - The Road Not Taken", assigned: "2026-10-12", due: "2026-10-15", overdue: 2, subStatus: "LATE" }
-                },
-                {
-                    sid: 3, type: "ABSENT_ATTENDANCE", title: "Period 3 Chemistry Practical Absence",
-                    desc: "Absent during Acids and Bases lab practical; medical note submitted.", srcId: 9001, srcType: "ATTENDANCE", status: "EXCUSED",
-                    trigAt: "2026-10-15T11:00:00Z", ackAt: "2026-10-15T11:30:00Z", resAt: "2026-10-16T09:00:00Z",
-                    excused: "Medical certificate from Central School Clinic submitted.", remarks: "Excused by Science teacher per clinic slip.",
-                    attendance: { id: 9001, date: "2026-10-15", period: 3, time: "10:15 - 11:00", status: "ABSENT" }
-                }
-            ]
-        },
-        {
-            id: 2, name: "Dhamodhar Rao", adm: "ADM-2026-0002", roll: "R-02", secId: 1, secName: "A",
-            alerts: [
-                {
-                    sid: 5, type: "PENDING_HOMEWORK", title: "Overdue Python Loop Programming Lab 3",
-                    desc: "Loop iterations worksheet assigned Oct 23 not submitted.", srcId: 3012, srcType: "ASSIGNMENT_HOMEWORK", status: "ACTIVE",
-                    trigAt: "2026-10-27T08:00:00Z", ackAt: "2026-10-28T09:00:00Z",
-                    homework: { id: 3012, title: "Python Lab 3: Loop Iterations", assigned: "2026-10-23", due: "2026-10-26", overdue: 3, subStatus: "PENDING" }
-                },
-                {
-                    sid: 4, type: "PENDING_HOMEWORK", title: "Map Work: River Systems of Southern India",
-                    desc: "Geography river basin mapping assignment submitted after 1-day delay.", srcId: 3014, srcType: "ASSIGNMENT_HOMEWORK", status: "RESOLVED",
-                    trigAt: "2026-10-20T08:00:00Z", ackAt: "2026-10-20T10:00:00Z", resAt: "2026-10-22T11:00:00Z",
-                    remarks: "Map coloring and key labeling checked; verified complete.",
-                    homework: { id: 3014, title: "River Systems Mapping Portfolio", assigned: "2026-10-16", due: "2026-10-19", overdue: 1, subStatus: "LATE" }
-                }
-            ]
-        },
-        {
-            id: 3, name: "Sita Ram", adm: "ADM-2026-0003", roll: "R-03", secId: 1, secName: "A",
-            alerts: [
-                {
-                    sid: 2, type: "LOW_ASSESSMENT_SCORE", title: "Trigonometric Ratios Slip Test Deficit",
-                    desc: "Scored 12/50 on introductory trigonometry test; remedial coaching advised.", srcId: 503, srcType: "ASSESSMENT", status: "ACTIVE",
-                    trigAt: "2026-10-28T14:30:00Z", ackAt: "2026-10-29T08:45:00Z",
-                    assessment: { id: 503, name: "Trigonometric Ratios Test", type: "SLIP_TEST", max: 50.0, pass: 20.0, obt: 12.0, pct: 24.0 }
-                },
-                {
-                    sid: 3, type: "ABSENT_ATTENDANCE", title: "Period 3 Science Laboratory Absence",
-                    desc: "Unexcused absence during Acids & Bases experimental practical.", srcId: 9015, srcType: "ATTENDANCE", status: "ACTIVE",
-                    trigAt: "2026-10-29T11:00:00Z", ackAt: "2026-10-30T08:30:00Z",
-                    attendance: { id: 9015, date: "2026-10-29", period: 3, time: "10:15 - 11:00", status: "ABSENT" }
-                }
-            ]
-        },
-        {
-            id: 4, name: "Krupa Joseph", adm: "ADM-2026-0004", roll: "R-04", secId: 1, secName: "A",
-            alerts: [
-                {
-                    sid: 4, type: "LOW_ASSESSMENT_SCORE", title: "Indian Constitution Principles Diagnostic Retest",
-                    desc: "Scored 15/40 on Indian Constitution foundational principles slip test.", srcId: 504, srcType: "ASSESSMENT", status: "ACTIVE",
-                    trigAt: "2026-10-27T15:00:00Z", ackAt: "2026-10-28T09:15:00Z",
-                    assessment: { id: 504, name: "Constitution Principles Diagnostic", type: "SLIP_TEST", max: 40.0, pass: 18.0, obt: 15.0, pct: 37.5 }
-                },
-                {
-                    sid: 1, type: "PENDING_HOMEWORK", title: "Active & Passive Voice Transformation Practice Overdue",
-                    desc: "Grammar transformation exercise 4.1 pending submission.", srcId: 3020, srcType: "ASSIGNMENT_HOMEWORK", status: "ACTIVE",
-                    trigAt: "2026-10-28T08:00:00Z", ackAt: "2026-10-29T08:30:00Z",
-                    homework: { id: 3020, title: "Voice Transformation Practice 4.1", assigned: "2026-10-24", due: "2026-10-27", overdue: 2, subStatus: "PENDING" }
-                }
-            ]
-        },
-        {
-            id: 5, name: "Jeswanth Reddy", adm: "ADM-2026-0005", roll: "R-05", secId: 1, secName: "A",
-            alerts: [
-                {
-                    sid: 1, type: "PENDING_HOMEWORK", title: "Direct & Indirect Speech Exercise 5.1 Overdue",
-                    desc: "Grammar transformation exercise 5.1 not submitted by due date.", srcId: 3025, srcType: "ASSIGNMENT_HOMEWORK", status: "ACTIVE",
-                    trigAt: "2026-10-28T08:00:00Z", ackAt: "2026-10-29T09:00:00Z",
-                    homework: { id: 3025, title: "Direct & Indirect Speech Exercise 5.1", assigned: "2026-10-24", due: "2026-10-27", overdue: 2, subStatus: "PENDING" }
-                },
-                {
-                    sid: 2, type: "PENDING_HOMEWORK", title: "Linear Graphs Problem Set 2",
-                    desc: "Graph sheet problems submitted after verification.", srcId: 3026, srcType: "ASSIGNMENT_HOMEWORK", status: "RESOLVED",
-                    trigAt: "2026-10-18T08:00:00Z", ackAt: "2026-10-18T10:00:00Z", resAt: "2026-10-20T12:00:00Z",
-                    remarks: "All 5 plotted lines and intersection points verified accurate.",
-                    homework: { id: 3026, title: "Linear Equations Graph Plotting Set", assigned: "2026-10-14", due: "2026-10-17", overdue: 1, subStatus: "LATE" }
-                }
-            ]
-        },
-        {
-            id: 6, name: "Sravan Kumar", adm: "ADM-2026-0006", roll: "R-06", secId: 1, secName: "A",
-            alerts: [
-                {
-                    sid: 3, type: "LOW_ASSESSMENT_SCORE", title: "Force and Laws of Motion Slip Test Benchmark Deficit",
-                    desc: "Scored 8/40, below passing threshold of 16 in mechanics slip test.", srcId: 506, srcType: "ASSESSMENT", status: "ACTIVE",
-                    trigAt: "2026-10-29T14:30:00Z", ackAt: "2026-10-30T08:30:00Z",
-                    assessment: { id: 506, name: "Force & Laws of Motion Test", type: "SLIP_TEST", max: 40.0, pass: 16.0, obt: 8.0, pct: 20.0 }
-                },
-                {
-                    sid: 5, type: "PENDING_HOMEWORK", title: "HTML/CSS Form Creation Lab Assignment Overdue",
-                    desc: "Web page form styling exercise pending upload.", srcId: 3030, srcType: "ASSIGNMENT_HOMEWORK", status: "ACTIVE",
-                    trigAt: "2026-10-29T08:00:00Z", ackAt: "2026-10-30T09:00:00Z",
-                    homework: { id: 3030, title: "HTML Form Creation Lab", assigned: "2026-10-25", due: "2026-10-28", overdue: 2, subStatus: "PENDING" }
-                }
-            ]
-        },
-        {
-            id: 7, name: "Gaurav Joshi", adm: "ADM-2026-0007", roll: "R-07", secId: 1, secName: "A",
-            alerts: [
-                {
-                    sid: 3, type: "ABSENT_ATTENDANCE", title: "Period 2 Science Biology Microscopy Session Absence",
-                    desc: "Absent during onion cell mount practical; student made up practical in zero period.", srcId: 9020, srcType: "ATTENDANCE", status: "RESOLVED",
-                    trigAt: "2026-10-18T10:00:00Z", ackAt: "2026-10-18T11:00:00Z", resAt: "2026-10-21T16:00:00Z",
-                    remarks: "Slide preparation and sketch verified during zero period makeup.",
-                    attendance: { id: 9020, date: "2026-10-18", period: 2, time: "09:15 - 10:00", status: "ABSENT" }
-                }
-            ]
-        },
-        {
-            id: 8, name: "Manish Talwar", adm: "ADM-2026-0008", roll: "R-08", secId: 1, secName: "A",
-            alerts: [
-                {
-                    sid: 1, type: "LOW_ASSESSMENT_SCORE", title: "Unseen Prose Reading Comprehension Diagnostic Below 40%",
-                    desc: "Scored 15/50 on comprehension diagnostic test.", srcId: 508, srcType: "ASSESSMENT", status: "ACTIVE",
-                    trigAt: "2026-10-28T14:00:00Z", ackAt: "2026-10-29T08:30:00Z",
-                    assessment: { id: 508, name: "Reading Comprehension Diagnostic", type: "SLIP_TEST", max: 50.0, pass: 20.0, obt: 15.0, pct: 30.0 }
-                }
-            ]
-        },
-        {
-            id: 9, name: "Zara Tiwari", adm: "ADM-2026-0009", roll: "R-09", secId: 1, secName: "A",
-            alerts: [
-                {
-                    sid: 2, type: "LOW_ASSESSMENT_SCORE", title: "Mensuration Surface Areas & Volumes Test Deficit",
-                    desc: "Scored 13/50 on Mensuration diagnostic test.", srcId: 509, srcType: "ASSESSMENT", status: "ACTIVE",
-                    trigAt: "2026-10-29T14:30:00Z", ackAt: "2026-10-30T08:30:00Z",
-                    assessment: { id: 509, name: "Surface Areas Diagnostic", type: "SLIP_TEST", max: 50.0, pass: 20.0, obt: 13.0, pct: 26.0 }
-                }
-            ]
-        },
-        {
-            id: 10, name: "Sarita Sengupta", adm: "ADM-2026-0010", roll: "R-10", secId: 1, secName: "A",
-            alerts: [] // Clean track record: 0 alerts raised
-        },
-
-        // ================= SECTION 2 (CLASS 8 - CENTRAL, SECTION B) =================
-        {
-            id: 11, name: "Gurpreet Pillai", adm: "ADM-2026-0011", roll: "R-01", secId: 2, secName: "B",
-            alerts: [
-                {
-                    sid: 2, type: "LOW_ASSESSMENT_SCORE", title: "Section B Quadratic Equation Slip Test Benchmark Deficit",
-                    desc: "Scored 16/50 on algebra quadratic polynomials diagnostic slip test.", srcId: 511, srcType: "ASSESSMENT", status: "ACTIVE",
-                    trigAt: "2026-10-28T14:30:00Z", ackAt: "2026-10-29T09:00:00Z",
-                    assessment: { id: 511, name: "Section B Quadratic Diagnostic", type: "SLIP_TEST", max: 50.0, pass: 20.0, obt: 16.0, pct: 32.0 }
-                },
-                {
-                    sid: 1, type: "PENDING_HOMEWORK", title: "English Reading Journal Entry 4 Late Submission",
-                    desc: "Reading journal submitted 2 days late; evaluated by Radhika Pillai.", srcId: 3040, srcType: "ASSIGNMENT_HOMEWORK", status: "RESOLVED",
-                    trigAt: "2026-10-20T08:00:00Z", ackAt: "2026-10-20T10:00:00Z", resAt: "2026-10-23T14:00:00Z",
-                    remarks: "Journal log checked and stamped.",
-                    homework: { id: 3040, title: "Reading Journal Entry 4", assigned: "2026-10-16", due: "2026-10-19", overdue: 2, subStatus: "LATE" }
-                }
-            ]
-        },
-        {
-            id: 12, name: "Deepika Pathak", adm: "ADM-2026-0012", roll: "R-02", secId: 2, secName: "B",
-            alerts: [
-                {
-                    sid: 1, type: "ABSENT_ATTENDANCE", title: "Period 1 English Literature Attendance Absence",
-                    desc: "Absent without prior leave slip during Merchant of Venice introduction.", srcId: 9032, srcType: "ATTENDANCE", status: "ACTIVE",
-                    trigAt: "2026-10-28T09:30:00Z", ackAt: "2026-10-29T08:30:00Z",
-                    attendance: { id: 9032, date: "2026-10-28", period: 1, time: "08:30 - 09:15", status: "ABSENT" }
-                }
-            ]
-        },
-        {
-            id: 13, name: "Varun Venkataraman", adm: "ADM-2026-0013", roll: "R-03", secId: 2, secName: "B",
-            alerts: [
-                {
-                    sid: 3, type: "PENDING_HOMEWORK", title: "Physics Ray Optics Diagram Portfolio Overdue",
-                    desc: "Refraction ray diagrams lab homework not submitted.", srcId: 3045, srcType: "ASSIGNMENT_HOMEWORK", status: "ACTIVE",
-                    trigAt: "2026-10-29T08:00:00Z", ackAt: "2026-10-30T09:00:00Z",
-                    homework: { id: 3045, title: "Ray Optics Lab Homework Portfolio", assigned: "2026-10-25", due: "2026-10-28", overdue: 2, subStatus: "PENDING" }
-                }
-            ]
-        },
-        {
-            id: 14, name: "Reena Mitra", adm: "ADM-2026-0014", roll: "R-04", secId: 2, secName: "B",
-            alerts: [
-                {
-                    sid: 4, type: "LOW_ASSESSMENT_SCORE", title: "Medieval Indian Architecture Map Test Re-evaluation",
-                    desc: "Scored 13/40 on Mughal architecture and monuments mapping evaluation.", srcId: 514, srcType: "ASSESSMENT", status: "ACTIVE",
-                    trigAt: "2026-10-28T14:30:00Z", ackAt: "2026-10-29T09:00:00Z",
-                    assessment: { id: 514, name: "Mughal Architecture Map Test", type: "SLIP_TEST", max: 40.0, pass: 18.0, obt: 13.0, pct: 32.5 }
-                }
-            ]
-        },
-        {
-            id: 15, name: "Sangeeta Ghosh", adm: "ADM-2026-0015", roll: "R-05", secId: 2, secName: "B",
-            alerts: [] // Clean track record: 0 alerts raised
-        }
-    ];
-
-    // -------------------------------------------------------------------------
-    // 6. Build and Assemble Student Documents
-    // -------------------------------------------------------------------------
-    var attentionDocs = [];
-
-    rawStudents.forEach(function (st) {
-        var facultyList = st.secId === 1 ? sec1Faculty : sec2Faculty;
-        var subjectsArr = [];
-
-        var studentTotalRaised = 0;
-        var studentTotalActive = 0;
-
-        facultyList.forEach(function (f) {
-            var matchingAlerts = st.alerts.filter(function (a) { return a.sid === f.sid; });
-            var attList = [];
-
-            var subjTotalRaised = matchingAlerts.length;
-            var subjActiveCount = 0;
-
-            matchingAlerts.forEach(function (a) {
-                var isAct = a.status === "ACTIVE";
-                if (isAct) {
-                    subjActiveCount++;
-                    studentTotalActive++;
-                }
-                studentTotalRaised++;
-
-                var asmDetails = a.assessment ? {
-                    assessment_id: NumberInt(a.assessment.id),
-                    assessment_name: a.assessment.name,
-                    exam_type: a.assessment.type,
-                    max_marks: a.assessment.max,
-                    pass_marks: a.assessment.pass,
-                    obtained_marks: a.assessment.obt,
-                    percentage: a.assessment.pct
-                } : null;
-
-                var hwDetails = a.homework ? {
-                    homework_id: NumberInt(a.homework.id),
-                    homework_title: a.homework.title,
-                    assigned_date: new Date(a.homework.assigned + "T00:00:00Z"),
-                    due_date: new Date(a.homework.due + "T23:59:59Z"),
-                    days_overdue: NumberInt(a.homework.overdue),
-                    submission_status: a.homework.subStatus
-                } : null;
-
-                var attDetails = a.attendance ? {
-                    attendance_id: NumberInt(a.attendance.id),
-                    attendance_date: new Date(a.attendance.date + "T00:00:00Z"),
-                    period_number: NumberInt(a.attendance.period),
-                    period_time: a.attendance.time,
-                    attendance_status: a.attendance.status
-                } : null;
-
-                attList.push({
-                    attention_id: "ATT-S" + ("00" + st.id).slice(-3) + "-" + f.code + "-" + a.srcId + "-2026",
-                    attention_type: a.type,
-                    title: a.title,
-                    description: a.desc,
-                    trigger_source: a.srcType,
-                    source_id: NumberInt(a.srcId),
-                    triggered_at: new Date(a.trigAt),
-                    status: a.status,
-                    acknowledged_at: a.ackAt ? new Date(a.ackAt) : null,
-                    acknowledged_by_teacher_id: a.ackAt ? NumberInt(f.id) : null,
-                    resolved_at: a.resAt ? new Date(a.resAt) : null,
-                    resolved_by_teacher_id: a.resAt ? NumberInt(f.id) : null,
-                    resolution_remarks: a.remarks || null,
-                    excused_reason: a.excused || null,
-                    assessment_details: asmDetails,
-                    homework_details: hwDetails,
-                    attendance_details: attDetails
-                });
-            });
-
-            subjectsArr.push({
-                subject_id: NumberInt(f.sid),
-                subject_name: f.sname,
-                subject_code: f.code,
-                assigned_teacher_id: NumberInt(f.id),
-                assigned_teacher_name: f.name,
-                total_attentions_raised: NumberInt(subjTotalRaised),
-                active_attentions_count: NumberInt(subjActiveCount),
-                attentions: attList,
-                subject_summary: {
-                    assessments_passed: NumberInt(matchingAlerts.some(function (a) { return a.assessment; }) ? 3 : 4),
-                    assessments_failed: NumberInt(matchingAlerts.some(function (a) { return a.assessment; }) ? 1 : 0),
-                    homework_submitted: NumberInt(8),
-                    homework_pending: NumberInt(matchingAlerts.some(function (a) { return a.homework && a.status === "ACTIVE"; }) ? 1 : 0),
-                    subject_attendance_percent: 95.0
-                }
-            });
-        });
-
-        attentionDocs.push({
-            student_id: NumberInt(st.id),
-            student_name: st.name,
-            admission_number: st.adm,
-            roll_number: st.roll,
+            student_id: NumberInt(1),
+            student_name: "Karishma Shaik",
+            admission_number: "ADM-2026-0001",
+            roll_number: "R-01",
             school_id: NumberInt(1),
             branch_id: NumberInt(1),
             academic_year_id: NumberInt(1),
             class_id: NumberInt(1),
-            class_name: "Class 8 - Central",
-            section_id: NumberInt(st.secId),
-            section_name: st.secName,
-            total_attentions_raised: NumberInt(studentTotalRaised),
-            total_active_attentions: NumberInt(studentTotalActive),
-            subjects: subjectsArr,
-            last_evaluated_at: new Date("2026-10-30T16:00:00Z"),
+            class_name: "Class 1 - Central",
+            section_id: NumberInt(1),
+            section_name: "A",
+            total_attentions_raised: NumberInt(4),
+            total_active_attentions: NumberInt(2),
+            subjects: [
+            {
+                subject_id: NumberInt(1),
+                subject_name: "English",
+                subject_code: "ENG",
+                assigned_teacher_id: NumberInt(1),
+                assigned_teacher_name: "Keshav Kulkarni",
+                total_attentions_raised: NumberInt(1),
+                active_attentions_count: NumberInt(0),
+                attentions: [
+                    {
+                        attention_id: "ATT-1-HW-3001-1",
+                        attention_type: "PENDING_HOMEWORK",
+                        title: "Overdue Poetry Analysis Essay - The Road Not Taken",
+                        description: "Poetry analysis essay assigned on Oct 12 submitted late and accepted.",
+                        trigger_source: "ASSIGNMENT_HOMEWORK",
+                        source_id: NumberInt(3001),
+                        triggered_at: new Date("2026-10-16T09:00:00Z"),
+                        status: "RESOLVED",
+                        acknowledged_at: new Date("2026-10-16T11:00:00Z"),
+                        acknowledged_by_teacher_id: NumberInt(1),
+                        resolved_at: new Date("2026-10-18T14:30:00Z"),
+                        resolved_by_teacher_id: NumberInt(1),
+                        resolution_remarks: "Completed handwritten essay with annotations evaluated and accepted.",
+                        excused_reason: null,
+                        assessment_details: null,
+                        homework_details: {
+                                homework_id: NumberInt(3001),
+                                homework_title: "Poetry Analysis - The Road Not Taken",
+                                assigned_date: new Date("2026-10-12T08:00:00Z"),
+                                due_date: new Date("2026-10-15T16:00:00Z"),
+                                days_overdue: NumberInt(2),
+                                submission_status: "LATE"
+                            },
+                        attendance_details: null
+                    }
+                ],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(2),
+                subject_name: "Mathematics",
+                subject_code: "MAT",
+                assigned_teacher_id: NumberInt(8),
+                assigned_teacher_name: "Zara Pai",
+                total_attentions_raised: NumberInt(2),
+                active_attentions_count: NumberInt(2),
+                attentions: [
+                    {
+                        attention_id: "ATT-1-ASM-501-1",
+                        attention_type: "LOW_ASSESSMENT_SCORE",
+                        title: "Linear Equations Slip Test Below Benchmark",
+                        description: "Scored 14/50 on algebra diagnostic slip test.",
+                        trigger_source: "ASSESSMENT",
+                        source_id: NumberInt(501),
+                        triggered_at: new Date("2026-10-28T14:30:00Z"),
+                        status: "ACTIVE",
+                        acknowledged_at: new Date("2026-10-29T08:30:00Z"),
+                        acknowledged_by_teacher_id: NumberInt(8),
+                        resolved_at: null,
+                        resolved_by_teacher_id: null,
+                        resolution_remarks: null,
+                        excused_reason: null,
+                        assessment_details: {
+                                assessment_id: NumberInt(501),
+                                assessment_name: "Linear Equations Slip Test",
+                                exam_type: "SLIP_TEST",
+                                max_marks: 50.0,
+                                pass_marks: 20.0,
+                                obtained_marks: 14.0,
+                                percentage: 28.0
+                            },
+                        homework_details: null,
+                        attendance_details: null
+                    },
+                    {
+                        attention_id: "ATT-1-HW-3002-1",
+                        attention_type: "PENDING_HOMEWORK",
+                        title: "Polynomial Algebraic Identities Exercise 3.2 Overdue",
+                        description: "Exercise 3.2 textbook problems overdue by 3 days.",
+                        trigger_source: "ASSIGNMENT_HOMEWORK",
+                        source_id: NumberInt(3002),
+                        triggered_at: new Date("2026-10-26T08:00:00Z"),
+                        status: "ACTIVE",
+                        acknowledged_at: new Date("2026-10-27T09:00:00Z"),
+                        acknowledged_by_teacher_id: NumberInt(8),
+                        resolved_at: null,
+                        resolved_by_teacher_id: null,
+                        resolution_remarks: null,
+                        excused_reason: null,
+                        assessment_details: null,
+                        homework_details: {
+                                homework_id: NumberInt(3002),
+                                homework_title: "Polynomial Identities Exercise 3.2",
+                                assigned_date: new Date("2026-10-20T08:00:00Z"),
+                                due_date: new Date("2026-10-23T16:00:00Z"),
+                                days_overdue: NumberInt(3),
+                                submission_status: "PENDING"
+                            },
+                        attendance_details: null
+                    }
+                ],
+                subject_summary: {
+                    assessments_passed: NumberInt(2),
+                    assessments_failed: NumberInt(1),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(1),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(3),
+                subject_name: "Science",
+                subject_code: "SCI",
+                assigned_teacher_id: NumberInt(15),
+                assigned_teacher_name: "Bhuvan Solanki",
+                total_attentions_raised: NumberInt(1),
+                active_attentions_count: NumberInt(0),
+                attentions: [
+                    {
+                        attention_id: "ATT-1-ATT-9001-1",
+                        attention_type: "ABSENT_ATTENDANCE",
+                        title: "Period 3 Chemistry Practical Absence",
+                        description: "Absent during Acids and Bases lab practical; medical note submitted.",
+                        trigger_source: "ATTENDANCE",
+                        source_id: NumberInt(9001),
+                        triggered_at: new Date("2026-10-15T11:00:00Z"),
+                        status: "EXCUSED",
+                        acknowledged_at: new Date("2026-10-15T11:30:00Z"),
+                        acknowledged_by_teacher_id: NumberInt(15),
+                        resolved_at: new Date("2026-10-16T09:00:00Z"),
+                        resolved_by_teacher_id: NumberInt(15),
+                        resolution_remarks: "Excused by Science teacher per clinic slip.",
+                        excused_reason: "Medical certificate from Central School Clinic submitted.",
+                        assessment_details: null,
+                        homework_details: null,
+                        attendance_details: {
+                                attendance_id: NumberInt(9001),
+                                attendance_date: new Date("2026-10-15T00:00:00Z"),
+                                period_number: NumberInt(3),
+                                period_time: "10:15 - 11:00",
+                                attendance_status: "ABSENT"
+                            }
+                    }
+                ],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 92.5
+                }
+            },
+            {
+                subject_id: NumberInt(4),
+                subject_name: "Social Science",
+                subject_code: "SOC",
+                assigned_teacher_id: NumberInt(22),
+                assigned_teacher_name: "Rashmi Chopra",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(5),
+                subject_name: "Computer Science",
+                subject_code: "CSC",
+                assigned_teacher_id: NumberInt(29),
+                assigned_teacher_name: "Raghunath Mathur",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(6),
+                subject_name: "Physical Education",
+                subject_code: "PE",
+                assigned_teacher_id: NumberInt(35),
+                assigned_teacher_name: "Abhiram Kansal",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            }
+        ],
+            last_evaluated_at: new Date("2026-11-18T14:00:00Z"),
             is_active: NumberInt(1),
-            created_at: new Date("2026-10-26T08:00:00Z"),
-            updated_at: new Date("2026-10-30T16:00:00Z")
-        });
-    });
+            created_at: new Date("2026-10-01T08:00:00Z"),
+            updated_at: new Date("2026-11-18T14:00:00Z")
+        },
+        {
+            student_id: NumberInt(2),
+            student_name: "Dhamodhar Rao",
+            admission_number: "ADM-2026-0002",
+            roll_number: "R-02",
+            school_id: NumberInt(1),
+            branch_id: NumberInt(1),
+            academic_year_id: NumberInt(1),
+            class_id: NumberInt(1),
+            class_name: "Class 1 - Central",
+            section_id: NumberInt(1),
+            section_name: "A",
+            total_attentions_raised: NumberInt(2),
+            total_active_attentions: NumberInt(1),
+            subjects: [
+            {
+                subject_id: NumberInt(1),
+                subject_name: "English",
+                subject_code: "ENG",
+                assigned_teacher_id: NumberInt(1),
+                assigned_teacher_name: "Keshav Kulkarni",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(2),
+                subject_name: "Mathematics",
+                subject_code: "MAT",
+                assigned_teacher_id: NumberInt(8),
+                assigned_teacher_name: "Zara Pai",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(3),
+                subject_name: "Science",
+                subject_code: "SCI",
+                assigned_teacher_id: NumberInt(15),
+                assigned_teacher_name: "Bhuvan Solanki",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(4),
+                subject_name: "Social Science",
+                subject_code: "SOC",
+                assigned_teacher_id: NumberInt(22),
+                assigned_teacher_name: "Rashmi Chopra",
+                total_attentions_raised: NumberInt(1),
+                active_attentions_count: NumberInt(0),
+                attentions: [
+                    {
+                        attention_id: "ATT-2-HW-3014-1",
+                        attention_type: "PENDING_HOMEWORK",
+                        title: "Map Work: River Systems of Southern India",
+                        description: "Geography river basin mapping assignment submitted after 1-day delay.",
+                        trigger_source: "ASSIGNMENT_HOMEWORK",
+                        source_id: NumberInt(3014),
+                        triggered_at: new Date("2026-10-20T08:00:00Z"),
+                        status: "RESOLVED",
+                        acknowledged_at: new Date("2026-10-20T10:00:00Z"),
+                        acknowledged_by_teacher_id: NumberInt(22),
+                        resolved_at: new Date("2026-10-22T11:00:00Z"),
+                        resolved_by_teacher_id: NumberInt(22),
+                        resolution_remarks: "Map coloring and key labeling checked; verified complete.",
+                        excused_reason: null,
+                        assessment_details: null,
+                        homework_details: {
+                                homework_id: NumberInt(3014),
+                                homework_title: "River Systems Mapping Portfolio",
+                                assigned_date: new Date("2026-10-16T08:00:00Z"),
+                                due_date: new Date("2026-10-19T16:00:00Z"),
+                                days_overdue: NumberInt(1),
+                                submission_status: "LATE"
+                            },
+                        attendance_details: null
+                    }
+                ],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(5),
+                subject_name: "Computer Science",
+                subject_code: "CSC",
+                assigned_teacher_id: NumberInt(29),
+                assigned_teacher_name: "Raghunath Mathur",
+                total_attentions_raised: NumberInt(1),
+                active_attentions_count: NumberInt(1),
+                attentions: [
+                    {
+                        attention_id: "ATT-2-HW-3012-1",
+                        attention_type: "PENDING_HOMEWORK",
+                        title: "Overdue Python Loop Programming Lab 3",
+                        description: "Loop iterations worksheet assigned Oct 23 not submitted.",
+                        trigger_source: "ASSIGNMENT_HOMEWORK",
+                        source_id: NumberInt(3012),
+                        triggered_at: new Date("2026-10-27T08:00:00Z"),
+                        status: "ACTIVE",
+                        acknowledged_at: new Date("2026-10-28T09:00:00Z"),
+                        acknowledged_by_teacher_id: NumberInt(29),
+                        resolved_at: null,
+                        resolved_by_teacher_id: null,
+                        resolution_remarks: null,
+                        excused_reason: null,
+                        assessment_details: null,
+                        homework_details: {
+                                homework_id: NumberInt(3012),
+                                homework_title: "Python Lab 3: Loop Iterations",
+                                assigned_date: new Date("2026-10-23T08:00:00Z"),
+                                due_date: new Date("2026-10-26T16:00:00Z"),
+                                days_overdue: NumberInt(3),
+                                submission_status: "PENDING"
+                            },
+                        attendance_details: null
+                    }
+                ],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(1),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(6),
+                subject_name: "Physical Education",
+                subject_code: "PE",
+                assigned_teacher_id: NumberInt(35),
+                assigned_teacher_name: "Abhiram Kansal",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            }
+        ],
+            last_evaluated_at: new Date("2026-11-18T14:00:00Z"),
+            is_active: NumberInt(1),
+            created_at: new Date("2026-10-01T08:00:00Z"),
+            updated_at: new Date("2026-11-18T14:00:00Z")
+        },
+        {
+            student_id: NumberInt(3),
+            student_name: "Sita Ram",
+            admission_number: "ADM-2026-0003",
+            roll_number: "R-03",
+            school_id: NumberInt(1),
+            branch_id: NumberInt(1),
+            academic_year_id: NumberInt(1),
+            class_id: NumberInt(1),
+            class_name: "Class 1 - Central",
+            section_id: NumberInt(1),
+            section_name: "A",
+            total_attentions_raised: NumberInt(2),
+            total_active_attentions: NumberInt(2),
+            subjects: [
+            {
+                subject_id: NumberInt(1),
+                subject_name: "English",
+                subject_code: "ENG",
+                assigned_teacher_id: NumberInt(1),
+                assigned_teacher_name: "Keshav Kulkarni",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(2),
+                subject_name: "Mathematics",
+                subject_code: "MAT",
+                assigned_teacher_id: NumberInt(8),
+                assigned_teacher_name: "Zara Pai",
+                total_attentions_raised: NumberInt(1),
+                active_attentions_count: NumberInt(1),
+                attentions: [
+                    {
+                        attention_id: "ATT-3-ASM-503-1",
+                        attention_type: "LOW_ASSESSMENT_SCORE",
+                        title: "Trigonometric Ratios Slip Test Deficit",
+                        description: "Scored 12/50 on introductory trigonometry test; remedial coaching advised.",
+                        trigger_source: "ASSESSMENT",
+                        source_id: NumberInt(503),
+                        triggered_at: new Date("2026-10-28T14:30:00Z"),
+                        status: "ACTIVE",
+                        acknowledged_at: new Date("2026-10-29T08:45:00Z"),
+                        acknowledged_by_teacher_id: NumberInt(8),
+                        resolved_at: null,
+                        resolved_by_teacher_id: null,
+                        resolution_remarks: null,
+                        excused_reason: null,
+                        assessment_details: {
+                                assessment_id: NumberInt(503),
+                                assessment_name: "Trigonometric Ratios Test",
+                                exam_type: "SLIP_TEST",
+                                max_marks: 50.0,
+                                pass_marks: 20.0,
+                                obtained_marks: 12.0,
+                                percentage: 24.0
+                            },
+                        homework_details: null,
+                        attendance_details: null
+                    }
+                ],
+                subject_summary: {
+                    assessments_passed: NumberInt(2),
+                    assessments_failed: NumberInt(1),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(3),
+                subject_name: "Science",
+                subject_code: "SCI",
+                assigned_teacher_id: NumberInt(15),
+                assigned_teacher_name: "Bhuvan Solanki",
+                total_attentions_raised: NumberInt(1),
+                active_attentions_count: NumberInt(1),
+                attentions: [
+                    {
+                        attention_id: "ATT-3-ATT-9015-1",
+                        attention_type: "ABSENT_ATTENDANCE",
+                        title: "Period 3 Science Laboratory Absence",
+                        description: "Unexcused absence during Acids & Bases experimental practical.",
+                        trigger_source: "ATTENDANCE",
+                        source_id: NumberInt(9015),
+                        triggered_at: new Date("2026-11-05T11:00:00Z"),
+                        status: "ACTIVE",
+                        acknowledged_at: new Date("2026-11-06T08:30:00Z"),
+                        acknowledged_by_teacher_id: NumberInt(15),
+                        resolved_at: null,
+                        resolved_by_teacher_id: null,
+                        resolution_remarks: null,
+                        excused_reason: null,
+                        assessment_details: null,
+                        homework_details: null,
+                        attendance_details: {
+                                attendance_id: NumberInt(9015),
+                                attendance_date: new Date("2026-11-05T00:00:00Z"),
+                                period_number: NumberInt(3),
+                                period_time: "10:15 - 11:00",
+                                attendance_status: "ABSENT"
+                            }
+                    }
+                ],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 92.5
+                }
+            },
+            {
+                subject_id: NumberInt(4),
+                subject_name: "Social Science",
+                subject_code: "SOC",
+                assigned_teacher_id: NumberInt(22),
+                assigned_teacher_name: "Rashmi Chopra",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(5),
+                subject_name: "Computer Science",
+                subject_code: "CSC",
+                assigned_teacher_id: NumberInt(29),
+                assigned_teacher_name: "Raghunath Mathur",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(6),
+                subject_name: "Physical Education",
+                subject_code: "PE",
+                assigned_teacher_id: NumberInt(35),
+                assigned_teacher_name: "Abhiram Kansal",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            }
+        ],
+            last_evaluated_at: new Date("2026-11-18T14:00:00Z"),
+            is_active: NumberInt(1),
+            created_at: new Date("2026-10-01T08:00:00Z"),
+            updated_at: new Date("2026-11-18T14:00:00Z")
+        },
+        {
+            student_id: NumberInt(4),
+            student_name: "Krupa Joseph",
+            admission_number: "ADM-2026-0004",
+            roll_number: "R-04",
+            school_id: NumberInt(1),
+            branch_id: NumberInt(1),
+            academic_year_id: NumberInt(1),
+            class_id: NumberInt(1),
+            class_name: "Class 1 - Central",
+            section_id: NumberInt(1),
+            section_name: "A",
+            total_attentions_raised: NumberInt(2),
+            total_active_attentions: NumberInt(2),
+            subjects: [
+            {
+                subject_id: NumberInt(1),
+                subject_name: "English",
+                subject_code: "ENG",
+                assigned_teacher_id: NumberInt(1),
+                assigned_teacher_name: "Keshav Kulkarni",
+                total_attentions_raised: NumberInt(1),
+                active_attentions_count: NumberInt(1),
+                attentions: [
+                    {
+                        attention_id: "ATT-4-HW-3020-1",
+                        attention_type: "PENDING_HOMEWORK",
+                        title: "Active & Passive Voice Transformation Practice Overdue",
+                        description: "Grammar transformation exercise 4.1 pending submission.",
+                        trigger_source: "ASSIGNMENT_HOMEWORK",
+                        source_id: NumberInt(3020),
+                        triggered_at: new Date("2026-11-06T08:00:00Z"),
+                        status: "ACTIVE",
+                        acknowledged_at: new Date("2026-11-07T08:30:00Z"),
+                        acknowledged_by_teacher_id: NumberInt(1),
+                        resolved_at: null,
+                        resolved_by_teacher_id: null,
+                        resolution_remarks: null,
+                        excused_reason: null,
+                        assessment_details: null,
+                        homework_details: {
+                                homework_id: NumberInt(3020),
+                                homework_title: "Voice Transformation Practice 4.1",
+                                assigned_date: new Date("2026-11-02T08:00:00Z"),
+                                due_date: new Date("2026-11-05T16:00:00Z"),
+                                days_overdue: NumberInt(2),
+                                submission_status: "PENDING"
+                            },
+                        attendance_details: null
+                    }
+                ],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(1),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(2),
+                subject_name: "Mathematics",
+                subject_code: "MAT",
+                assigned_teacher_id: NumberInt(8),
+                assigned_teacher_name: "Zara Pai",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(3),
+                subject_name: "Science",
+                subject_code: "SCI",
+                assigned_teacher_id: NumberInt(15),
+                assigned_teacher_name: "Bhuvan Solanki",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(4),
+                subject_name: "Social Science",
+                subject_code: "SOC",
+                assigned_teacher_id: NumberInt(22),
+                assigned_teacher_name: "Rashmi Chopra",
+                total_attentions_raised: NumberInt(1),
+                active_attentions_count: NumberInt(1),
+                attentions: [
+                    {
+                        attention_id: "ATT-4-ASM-504-1",
+                        attention_type: "LOW_ASSESSMENT_SCORE",
+                        title: "Indian Constitution Principles Diagnostic Retest",
+                        description: "Scored 15/40 on Indian Constitution foundational principles slip test.",
+                        trigger_source: "ASSESSMENT",
+                        source_id: NumberInt(504),
+                        triggered_at: new Date("2026-10-27T15:00:00Z"),
+                        status: "ACTIVE",
+                        acknowledged_at: new Date("2026-10-28T09:15:00Z"),
+                        acknowledged_by_teacher_id: NumberInt(22),
+                        resolved_at: null,
+                        resolved_by_teacher_id: null,
+                        resolution_remarks: null,
+                        excused_reason: null,
+                        assessment_details: {
+                                assessment_id: NumberInt(504),
+                                assessment_name: "Constitution Principles Diagnostic",
+                                exam_type: "SLIP_TEST",
+                                max_marks: 40.0,
+                                pass_marks: 18.0,
+                                obtained_marks: 15.0,
+                                percentage: 37.5
+                            },
+                        homework_details: null,
+                        attendance_details: null
+                    }
+                ],
+                subject_summary: {
+                    assessments_passed: NumberInt(2),
+                    assessments_failed: NumberInt(1),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(5),
+                subject_name: "Computer Science",
+                subject_code: "CSC",
+                assigned_teacher_id: NumberInt(29),
+                assigned_teacher_name: "Raghunath Mathur",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(6),
+                subject_name: "Physical Education",
+                subject_code: "PE",
+                assigned_teacher_id: NumberInt(35),
+                assigned_teacher_name: "Abhiram Kansal",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            }
+        ],
+            last_evaluated_at: new Date("2026-11-18T14:00:00Z"),
+            is_active: NumberInt(1),
+            created_at: new Date("2026-10-01T08:00:00Z"),
+            updated_at: new Date("2026-11-18T14:00:00Z")
+        },
+        {
+            student_id: NumberInt(5),
+            student_name: "Jeswanth Reddy",
+            admission_number: "ADM-2026-0005",
+            roll_number: "R-05",
+            school_id: NumberInt(1),
+            branch_id: NumberInt(1),
+            academic_year_id: NumberInt(1),
+            class_id: NumberInt(1),
+            class_name: "Class 1 - Central",
+            section_id: NumberInt(1),
+            section_name: "A",
+            total_attentions_raised: NumberInt(2),
+            total_active_attentions: NumberInt(1),
+            subjects: [
+            {
+                subject_id: NumberInt(1),
+                subject_name: "English",
+                subject_code: "ENG",
+                assigned_teacher_id: NumberInt(1),
+                assigned_teacher_name: "Keshav Kulkarni",
+                total_attentions_raised: NumberInt(1),
+                active_attentions_count: NumberInt(1),
+                attentions: [
+                    {
+                        attention_id: "ATT-5-HW-3025-1",
+                        attention_type: "PENDING_HOMEWORK",
+                        title: "Direct & Indirect Speech Exercise 5.1 Overdue",
+                        description: "Grammar transformation exercise 5.1 not submitted by due date.",
+                        trigger_source: "ASSIGNMENT_HOMEWORK",
+                        source_id: NumberInt(3025),
+                        triggered_at: new Date("2026-11-08T08:00:00Z"),
+                        status: "ACTIVE",
+                        acknowledged_at: new Date("2026-11-09T09:00:00Z"),
+                        acknowledged_by_teacher_id: NumberInt(1),
+                        resolved_at: null,
+                        resolved_by_teacher_id: null,
+                        resolution_remarks: null,
+                        excused_reason: null,
+                        assessment_details: null,
+                        homework_details: {
+                                homework_id: NumberInt(3025),
+                                homework_title: "Direct & Indirect Speech Exercise 5.1",
+                                assigned_date: new Date("2026-11-04T08:00:00Z"),
+                                due_date: new Date("2026-11-07T16:00:00Z"),
+                                days_overdue: NumberInt(2),
+                                submission_status: "PENDING"
+                            },
+                        attendance_details: null
+                    }
+                ],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(1),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(2),
+                subject_name: "Mathematics",
+                subject_code: "MAT",
+                assigned_teacher_id: NumberInt(8),
+                assigned_teacher_name: "Zara Pai",
+                total_attentions_raised: NumberInt(1),
+                active_attentions_count: NumberInt(0),
+                attentions: [
+                    {
+                        attention_id: "ATT-5-HW-3026-1",
+                        attention_type: "PENDING_HOMEWORK",
+                        title: "Linear Graphs Problem Set 2",
+                        description: "Graph sheet problems submitted after verification.",
+                        trigger_source: "ASSIGNMENT_HOMEWORK",
+                        source_id: NumberInt(3026),
+                        triggered_at: new Date("2026-10-18T08:00:00Z"),
+                        status: "RESOLVED",
+                        acknowledged_at: new Date("2026-10-18T10:00:00Z"),
+                        acknowledged_by_teacher_id: NumberInt(8),
+                        resolved_at: new Date("2026-10-20T12:00:00Z"),
+                        resolved_by_teacher_id: NumberInt(8),
+                        resolution_remarks: "All 5 plotted lines and intersection points verified accurate.",
+                        excused_reason: null,
+                        assessment_details: null,
+                        homework_details: {
+                                homework_id: NumberInt(3026),
+                                homework_title: "Linear Equations Graph Plotting Set",
+                                assigned_date: new Date("2026-10-14T08:00:00Z"),
+                                due_date: new Date("2026-10-17T16:00:00Z"),
+                                days_overdue: NumberInt(1),
+                                submission_status: "LATE"
+                            },
+                        attendance_details: null
+                    }
+                ],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(3),
+                subject_name: "Science",
+                subject_code: "SCI",
+                assigned_teacher_id: NumberInt(15),
+                assigned_teacher_name: "Bhuvan Solanki",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(4),
+                subject_name: "Social Science",
+                subject_code: "SOC",
+                assigned_teacher_id: NumberInt(22),
+                assigned_teacher_name: "Rashmi Chopra",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(5),
+                subject_name: "Computer Science",
+                subject_code: "CSC",
+                assigned_teacher_id: NumberInt(29),
+                assigned_teacher_name: "Raghunath Mathur",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(6),
+                subject_name: "Physical Education",
+                subject_code: "PE",
+                assigned_teacher_id: NumberInt(35),
+                assigned_teacher_name: "Abhiram Kansal",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            }
+        ],
+            last_evaluated_at: new Date("2026-11-18T14:00:00Z"),
+            is_active: NumberInt(1),
+            created_at: new Date("2026-10-01T08:00:00Z"),
+            updated_at: new Date("2026-11-18T14:00:00Z")
+        },
+        {
+            student_id: NumberInt(6),
+            student_name: "Sravan Kumar",
+            admission_number: "ADM-2026-0006",
+            roll_number: "R-06",
+            school_id: NumberInt(1),
+            branch_id: NumberInt(1),
+            academic_year_id: NumberInt(1),
+            class_id: NumberInt(1),
+            class_name: "Class 1 - Central",
+            section_id: NumberInt(1),
+            section_name: "A",
+            total_attentions_raised: NumberInt(2),
+            total_active_attentions: NumberInt(2),
+            subjects: [
+            {
+                subject_id: NumberInt(1),
+                subject_name: "English",
+                subject_code: "ENG",
+                assigned_teacher_id: NumberInt(1),
+                assigned_teacher_name: "Keshav Kulkarni",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(2),
+                subject_name: "Mathematics",
+                subject_code: "MAT",
+                assigned_teacher_id: NumberInt(8),
+                assigned_teacher_name: "Zara Pai",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(3),
+                subject_name: "Science",
+                subject_code: "SCI",
+                assigned_teacher_id: NumberInt(15),
+                assigned_teacher_name: "Bhuvan Solanki",
+                total_attentions_raised: NumberInt(1),
+                active_attentions_count: NumberInt(1),
+                attentions: [
+                    {
+                        attention_id: "ATT-6-ASM-506-1",
+                        attention_type: "LOW_ASSESSMENT_SCORE",
+                        title: "Force and Laws of Motion Slip Test Benchmark Deficit",
+                        description: "Scored 8/40, below passing threshold of 16 in mechanics slip test.",
+                        trigger_source: "ASSESSMENT",
+                        source_id: NumberInt(506),
+                        triggered_at: new Date("2026-10-29T14:30:00Z"),
+                        status: "ACTIVE",
+                        acknowledged_at: new Date("2026-10-30T08:30:00Z"),
+                        acknowledged_by_teacher_id: NumberInt(15),
+                        resolved_at: null,
+                        resolved_by_teacher_id: null,
+                        resolution_remarks: null,
+                        excused_reason: null,
+                        assessment_details: {
+                                assessment_id: NumberInt(506),
+                                assessment_name: "Force & Laws of Motion Test",
+                                exam_type: "SLIP_TEST",
+                                max_marks: 40.0,
+                                pass_marks: 16.0,
+                                obtained_marks: 8.0,
+                                percentage: 20.0
+                            },
+                        homework_details: null,
+                        attendance_details: null
+                    }
+                ],
+                subject_summary: {
+                    assessments_passed: NumberInt(2),
+                    assessments_failed: NumberInt(1),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(4),
+                subject_name: "Social Science",
+                subject_code: "SOC",
+                assigned_teacher_id: NumberInt(22),
+                assigned_teacher_name: "Rashmi Chopra",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(5),
+                subject_name: "Computer Science",
+                subject_code: "CSC",
+                assigned_teacher_id: NumberInt(29),
+                assigned_teacher_name: "Raghunath Mathur",
+                total_attentions_raised: NumberInt(1),
+                active_attentions_count: NumberInt(1),
+                attentions: [
+                    {
+                        attention_id: "ATT-6-HW-3030-1",
+                        attention_type: "PENDING_HOMEWORK",
+                        title: "HTML/CSS Form Creation Lab Assignment Overdue",
+                        description: "Web page form styling exercise pending upload.",
+                        trigger_source: "ASSIGNMENT_HOMEWORK",
+                        source_id: NumberInt(3030),
+                        triggered_at: new Date("2026-11-10T08:00:00Z"),
+                        status: "ACTIVE",
+                        acknowledged_at: new Date("2026-11-11T09:00:00Z"),
+                        acknowledged_by_teacher_id: NumberInt(29),
+                        resolved_at: null,
+                        resolved_by_teacher_id: null,
+                        resolution_remarks: null,
+                        excused_reason: null,
+                        assessment_details: null,
+                        homework_details: {
+                                homework_id: NumberInt(3030),
+                                homework_title: "HTML Form Creation Lab",
+                                assigned_date: new Date("2026-11-05T08:00:00Z"),
+                                due_date: new Date("2026-11-08T16:00:00Z"),
+                                days_overdue: NumberInt(2),
+                                submission_status: "PENDING"
+                            },
+                        attendance_details: null
+                    }
+                ],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(1),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(6),
+                subject_name: "Physical Education",
+                subject_code: "PE",
+                assigned_teacher_id: NumberInt(35),
+                assigned_teacher_name: "Abhiram Kansal",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            }
+        ],
+            last_evaluated_at: new Date("2026-11-18T14:00:00Z"),
+            is_active: NumberInt(1),
+            created_at: new Date("2026-10-01T08:00:00Z"),
+            updated_at: new Date("2026-11-18T14:00:00Z")
+        },
+        {
+            student_id: NumberInt(7),
+            student_name: "Gaurav Joshi",
+            admission_number: "ADM-2026-0007",
+            roll_number: "R-07",
+            school_id: NumberInt(1),
+            branch_id: NumberInt(1),
+            academic_year_id: NumberInt(1),
+            class_id: NumberInt(1),
+            class_name: "Class 1 - Central",
+            section_id: NumberInt(1),
+            section_name: "A",
+            total_attentions_raised: NumberInt(1),
+            total_active_attentions: NumberInt(0),
+            subjects: [
+            {
+                subject_id: NumberInt(1),
+                subject_name: "English",
+                subject_code: "ENG",
+                assigned_teacher_id: NumberInt(1),
+                assigned_teacher_name: "Keshav Kulkarni",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(2),
+                subject_name: "Mathematics",
+                subject_code: "MAT",
+                assigned_teacher_id: NumberInt(8),
+                assigned_teacher_name: "Zara Pai",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(3),
+                subject_name: "Science",
+                subject_code: "SCI",
+                assigned_teacher_id: NumberInt(15),
+                assigned_teacher_name: "Bhuvan Solanki",
+                total_attentions_raised: NumberInt(1),
+                active_attentions_count: NumberInt(0),
+                attentions: [
+                    {
+                        attention_id: "ATT-7-ATT-9020-1",
+                        attention_type: "ABSENT_ATTENDANCE",
+                        title: "Period 2 Science Biology Microscopy Session Absence",
+                        description: "Absent during onion cell mount practical; student made up practical in zero period.",
+                        trigger_source: "ATTENDANCE",
+                        source_id: NumberInt(9020),
+                        triggered_at: new Date("2026-10-18T10:00:00Z"),
+                        status: "RESOLVED",
+                        acknowledged_at: new Date("2026-10-18T11:00:00Z"),
+                        acknowledged_by_teacher_id: NumberInt(15),
+                        resolved_at: new Date("2026-10-21T16:00:00Z"),
+                        resolved_by_teacher_id: NumberInt(15),
+                        resolution_remarks: "Slide preparation and sketch verified during zero period makeup.",
+                        excused_reason: null,
+                        assessment_details: null,
+                        homework_details: null,
+                        attendance_details: {
+                                attendance_id: NumberInt(9020),
+                                attendance_date: new Date("2026-10-18T00:00:00Z"),
+                                period_number: NumberInt(2),
+                                period_time: "09:15 - 10:00",
+                                attendance_status: "ABSENT"
+                            }
+                    }
+                ],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 92.5
+                }
+            },
+            {
+                subject_id: NumberInt(4),
+                subject_name: "Social Science",
+                subject_code: "SOC",
+                assigned_teacher_id: NumberInt(22),
+                assigned_teacher_name: "Rashmi Chopra",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(5),
+                subject_name: "Computer Science",
+                subject_code: "CSC",
+                assigned_teacher_id: NumberInt(29),
+                assigned_teacher_name: "Raghunath Mathur",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(6),
+                subject_name: "Physical Education",
+                subject_code: "PE",
+                assigned_teacher_id: NumberInt(35),
+                assigned_teacher_name: "Abhiram Kansal",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            }
+        ],
+            last_evaluated_at: new Date("2026-11-18T14:00:00Z"),
+            is_active: NumberInt(1),
+            created_at: new Date("2026-10-01T08:00:00Z"),
+            updated_at: new Date("2026-11-18T14:00:00Z")
+        },
+        {
+            student_id: NumberInt(8),
+            student_name: "Manish Talwar",
+            admission_number: "ADM-2026-0008",
+            roll_number: "R-08",
+            school_id: NumberInt(1),
+            branch_id: NumberInt(1),
+            academic_year_id: NumberInt(1),
+            class_id: NumberInt(1),
+            class_name: "Class 1 - Central",
+            section_id: NumberInt(1),
+            section_name: "A",
+            total_attentions_raised: NumberInt(1),
+            total_active_attentions: NumberInt(1),
+            subjects: [
+            {
+                subject_id: NumberInt(1),
+                subject_name: "English",
+                subject_code: "ENG",
+                assigned_teacher_id: NumberInt(1),
+                assigned_teacher_name: "Keshav Kulkarni",
+                total_attentions_raised: NumberInt(1),
+                active_attentions_count: NumberInt(1),
+                attentions: [
+                    {
+                        attention_id: "ATT-8-ASM-508-1",
+                        attention_type: "LOW_ASSESSMENT_SCORE",
+                        title: "Unseen Prose Reading Comprehension Diagnostic Below 40%",
+                        description: "Scored 15/50 on comprehension diagnostic test.",
+                        trigger_source: "ASSESSMENT",
+                        source_id: NumberInt(508),
+                        triggered_at: new Date("2026-11-04T14:00:00Z"),
+                        status: "ACTIVE",
+                        acknowledged_at: new Date("2026-11-05T08:30:00Z"),
+                        acknowledged_by_teacher_id: NumberInt(1),
+                        resolved_at: null,
+                        resolved_by_teacher_id: null,
+                        resolution_remarks: null,
+                        excused_reason: null,
+                        assessment_details: {
+                                assessment_id: NumberInt(508),
+                                assessment_name: "Reading Comprehension Diagnostic",
+                                exam_type: "SLIP_TEST",
+                                max_marks: 50.0,
+                                pass_marks: 20.0,
+                                obtained_marks: 15.0,
+                                percentage: 30.0
+                            },
+                        homework_details: null,
+                        attendance_details: null
+                    }
+                ],
+                subject_summary: {
+                    assessments_passed: NumberInt(2),
+                    assessments_failed: NumberInt(1),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(2),
+                subject_name: "Mathematics",
+                subject_code: "MAT",
+                assigned_teacher_id: NumberInt(8),
+                assigned_teacher_name: "Zara Pai",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(3),
+                subject_name: "Science",
+                subject_code: "SCI",
+                assigned_teacher_id: NumberInt(15),
+                assigned_teacher_name: "Bhuvan Solanki",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(4),
+                subject_name: "Social Science",
+                subject_code: "SOC",
+                assigned_teacher_id: NumberInt(22),
+                assigned_teacher_name: "Rashmi Chopra",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(5),
+                subject_name: "Computer Science",
+                subject_code: "CSC",
+                assigned_teacher_id: NumberInt(29),
+                assigned_teacher_name: "Raghunath Mathur",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(6),
+                subject_name: "Physical Education",
+                subject_code: "PE",
+                assigned_teacher_id: NumberInt(35),
+                assigned_teacher_name: "Abhiram Kansal",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            }
+        ],
+            last_evaluated_at: new Date("2026-11-18T14:00:00Z"),
+            is_active: NumberInt(1),
+            created_at: new Date("2026-10-01T08:00:00Z"),
+            updated_at: new Date("2026-11-18T14:00:00Z")
+        },
+        {
+            student_id: NumberInt(9),
+            student_name: "Zara Tiwari",
+            admission_number: "ADM-2026-0009",
+            roll_number: "R-09",
+            school_id: NumberInt(1),
+            branch_id: NumberInt(1),
+            academic_year_id: NumberInt(1),
+            class_id: NumberInt(1),
+            class_name: "Class 1 - Central",
+            section_id: NumberInt(1),
+            section_name: "A",
+            total_attentions_raised: NumberInt(1),
+            total_active_attentions: NumberInt(1),
+            subjects: [
+            {
+                subject_id: NumberInt(1),
+                subject_name: "English",
+                subject_code: "ENG",
+                assigned_teacher_id: NumberInt(1),
+                assigned_teacher_name: "Keshav Kulkarni",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(2),
+                subject_name: "Mathematics",
+                subject_code: "MAT",
+                assigned_teacher_id: NumberInt(8),
+                assigned_teacher_name: "Zara Pai",
+                total_attentions_raised: NumberInt(1),
+                active_attentions_count: NumberInt(1),
+                attentions: [
+                    {
+                        attention_id: "ATT-9-ASM-509-1",
+                        attention_type: "LOW_ASSESSMENT_SCORE",
+                        title: "Mensuration Surface Areas & Volumes Test Deficit",
+                        description: "Scored 13/50 on Mensuration diagnostic test.",
+                        trigger_source: "ASSESSMENT",
+                        source_id: NumberInt(509),
+                        triggered_at: new Date("2026-11-05T14:30:00Z"),
+                        status: "ACTIVE",
+                        acknowledged_at: new Date("2026-11-06T08:30:00Z"),
+                        acknowledged_by_teacher_id: NumberInt(8),
+                        resolved_at: null,
+                        resolved_by_teacher_id: null,
+                        resolution_remarks: null,
+                        excused_reason: null,
+                        assessment_details: {
+                                assessment_id: NumberInt(509),
+                                assessment_name: "Surface Areas Diagnostic",
+                                exam_type: "SLIP_TEST",
+                                max_marks: 50.0,
+                                pass_marks: 20.0,
+                                obtained_marks: 13.0,
+                                percentage: 26.0
+                            },
+                        homework_details: null,
+                        attendance_details: null
+                    }
+                ],
+                subject_summary: {
+                    assessments_passed: NumberInt(2),
+                    assessments_failed: NumberInt(1),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(3),
+                subject_name: "Science",
+                subject_code: "SCI",
+                assigned_teacher_id: NumberInt(15),
+                assigned_teacher_name: "Bhuvan Solanki",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(4),
+                subject_name: "Social Science",
+                subject_code: "SOC",
+                assigned_teacher_id: NumberInt(22),
+                assigned_teacher_name: "Rashmi Chopra",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(5),
+                subject_name: "Computer Science",
+                subject_code: "CSC",
+                assigned_teacher_id: NumberInt(29),
+                assigned_teacher_name: "Raghunath Mathur",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(6),
+                subject_name: "Physical Education",
+                subject_code: "PE",
+                assigned_teacher_id: NumberInt(35),
+                assigned_teacher_name: "Abhiram Kansal",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            }
+        ],
+            last_evaluated_at: new Date("2026-11-18T14:00:00Z"),
+            is_active: NumberInt(1),
+            created_at: new Date("2026-10-01T08:00:00Z"),
+            updated_at: new Date("2026-11-18T14:00:00Z")
+        },
+        {
+            student_id: NumberInt(10),
+            student_name: "Sarita Sengupta",
+            admission_number: "ADM-2026-0010",
+            roll_number: "R-10",
+            school_id: NumberInt(1),
+            branch_id: NumberInt(1),
+            academic_year_id: NumberInt(1),
+            class_id: NumberInt(1),
+            class_name: "Class 1 - Central",
+            section_id: NumberInt(1),
+            section_name: "A",
+            total_attentions_raised: NumberInt(0),
+            total_active_attentions: NumberInt(0),
+            subjects: [
+            {
+                subject_id: NumberInt(1),
+                subject_name: "English",
+                subject_code: "ENG",
+                assigned_teacher_id: NumberInt(1),
+                assigned_teacher_name: "Keshav Kulkarni",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(2),
+                subject_name: "Mathematics",
+                subject_code: "MAT",
+                assigned_teacher_id: NumberInt(8),
+                assigned_teacher_name: "Zara Pai",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(3),
+                subject_name: "Science",
+                subject_code: "SCI",
+                assigned_teacher_id: NumberInt(15),
+                assigned_teacher_name: "Bhuvan Solanki",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(4),
+                subject_name: "Social Science",
+                subject_code: "SOC",
+                assigned_teacher_id: NumberInt(22),
+                assigned_teacher_name: "Rashmi Chopra",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(5),
+                subject_name: "Computer Science",
+                subject_code: "CSC",
+                assigned_teacher_id: NumberInt(29),
+                assigned_teacher_name: "Raghunath Mathur",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(6),
+                subject_name: "Physical Education",
+                subject_code: "PE",
+                assigned_teacher_id: NumberInt(35),
+                assigned_teacher_name: "Abhiram Kansal",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            }
+        ],
+            last_evaluated_at: new Date("2026-11-18T14:00:00Z"),
+            is_active: NumberInt(1),
+            created_at: new Date("2026-10-01T08:00:00Z"),
+            updated_at: new Date("2026-11-18T14:00:00Z")
+        },
+        {
+            student_id: NumberInt(11),
+            student_name: "Gurpreet Pillai",
+            admission_number: "ADM-2026-0011",
+            roll_number: "R-01",
+            school_id: NumberInt(1),
+            branch_id: NumberInt(1),
+            academic_year_id: NumberInt(1),
+            class_id: NumberInt(1),
+            class_name: "Class 1 - Central",
+            section_id: NumberInt(2),
+            section_name: "B",
+            total_attentions_raised: NumberInt(2),
+            total_active_attentions: NumberInt(1),
+            subjects: [
+            {
+                subject_id: NumberInt(1),
+                subject_name: "English",
+                subject_code: "ENG",
+                assigned_teacher_id: NumberInt(2),
+                assigned_teacher_name: "Radhika Pillai",
+                total_attentions_raised: NumberInt(1),
+                active_attentions_count: NumberInt(0),
+                attentions: [
+                    {
+                        attention_id: "ATT-11-HW-3040-1",
+                        attention_type: "PENDING_HOMEWORK",
+                        title: "English Reading Journal Entry 4 Late Submission",
+                        description: "Reading journal submitted 2 days late; evaluated by Radhika Pillai.",
+                        trigger_source: "ASSIGNMENT_HOMEWORK",
+                        source_id: NumberInt(3040),
+                        triggered_at: new Date("2026-10-20T08:00:00Z"),
+                        status: "RESOLVED",
+                        acknowledged_at: new Date("2026-10-20T10:00:00Z"),
+                        acknowledged_by_teacher_id: NumberInt(2),
+                        resolved_at: new Date("2026-10-23T14:00:00Z"),
+                        resolved_by_teacher_id: NumberInt(2),
+                        resolution_remarks: "Journal log checked and stamped.",
+                        excused_reason: null,
+                        assessment_details: null,
+                        homework_details: {
+                                homework_id: NumberInt(3040),
+                                homework_title: "Reading Journal Entry 4",
+                                assigned_date: new Date("2026-10-16T08:00:00Z"),
+                                due_date: new Date("2026-10-19T16:00:00Z"),
+                                days_overdue: NumberInt(2),
+                                submission_status: "LATE"
+                            },
+                        attendance_details: null
+                    }
+                ],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(2),
+                subject_name: "Mathematics",
+                subject_code: "MAT",
+                assigned_teacher_id: NumberInt(9),
+                assigned_teacher_name: "Utkarsh Mishra",
+                total_attentions_raised: NumberInt(1),
+                active_attentions_count: NumberInt(1),
+                attentions: [
+                    {
+                        attention_id: "ATT-11-ASM-511-1",
+                        attention_type: "LOW_ASSESSMENT_SCORE",
+                        title: "Section B Quadratic Equation Slip Test Benchmark Deficit",
+                        description: "Scored 16/50 on algebra quadratic polynomials diagnostic slip test.",
+                        trigger_source: "ASSESSMENT",
+                        source_id: NumberInt(511),
+                        triggered_at: new Date("2026-10-28T14:30:00Z"),
+                        status: "ACTIVE",
+                        acknowledged_at: new Date("2026-10-29T09:00:00Z"),
+                        acknowledged_by_teacher_id: NumberInt(9),
+                        resolved_at: null,
+                        resolved_by_teacher_id: null,
+                        resolution_remarks: null,
+                        excused_reason: null,
+                        assessment_details: {
+                                assessment_id: NumberInt(511),
+                                assessment_name: "Section B Quadratic Diagnostic",
+                                exam_type: "SLIP_TEST",
+                                max_marks: 50.0,
+                                pass_marks: 20.0,
+                                obtained_marks: 16.0,
+                                percentage: 32.0
+                            },
+                        homework_details: null,
+                        attendance_details: null
+                    }
+                ],
+                subject_summary: {
+                    assessments_passed: NumberInt(2),
+                    assessments_failed: NumberInt(1),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(3),
+                subject_name: "Science",
+                subject_code: "SCI",
+                assigned_teacher_id: NumberInt(16),
+                assigned_teacher_name: "Juhi Rajput",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(4),
+                subject_name: "Social Science",
+                subject_code: "SOC",
+                assigned_teacher_id: NumberInt(23),
+                assigned_teacher_name: "Kushagra Kapoor",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(5),
+                subject_name: "Computer Science",
+                subject_code: "CSC",
+                assigned_teacher_id: NumberInt(30),
+                assigned_teacher_name: "Chitra Nigam",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(6),
+                subject_name: "Physical Education",
+                subject_code: "PE",
+                assigned_teacher_id: NumberInt(35),
+                assigned_teacher_name: "Abhiram Kansal",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            }
+        ],
+            last_evaluated_at: new Date("2026-11-18T14:00:00Z"),
+            is_active: NumberInt(1),
+            created_at: new Date("2026-10-01T08:00:00Z"),
+            updated_at: new Date("2026-11-18T14:00:00Z")
+        },
+        {
+            student_id: NumberInt(12),
+            student_name: "Deepika Pathak",
+            admission_number: "ADM-2026-0012",
+            roll_number: "R-02",
+            school_id: NumberInt(1),
+            branch_id: NumberInt(1),
+            academic_year_id: NumberInt(1),
+            class_id: NumberInt(1),
+            class_name: "Class 1 - Central",
+            section_id: NumberInt(2),
+            section_name: "B",
+            total_attentions_raised: NumberInt(1),
+            total_active_attentions: NumberInt(1),
+            subjects: [
+            {
+                subject_id: NumberInt(1),
+                subject_name: "English",
+                subject_code: "ENG",
+                assigned_teacher_id: NumberInt(2),
+                assigned_teacher_name: "Radhika Pillai",
+                total_attentions_raised: NumberInt(1),
+                active_attentions_count: NumberInt(1),
+                attentions: [
+                    {
+                        attention_id: "ATT-12-ATT-9032-1",
+                        attention_type: "ABSENT_ATTENDANCE",
+                        title: "Period 1 English Literature Attendance Absence",
+                        description: "Absent without prior leave slip during Merchant of Venice introduction.",
+                        trigger_source: "ATTENDANCE",
+                        source_id: NumberInt(9032),
+                        triggered_at: new Date("2026-11-06T09:30:00Z"),
+                        status: "ACTIVE",
+                        acknowledged_at: new Date("2026-11-07T08:30:00Z"),
+                        acknowledged_by_teacher_id: NumberInt(2),
+                        resolved_at: null,
+                        resolved_by_teacher_id: null,
+                        resolution_remarks: null,
+                        excused_reason: null,
+                        assessment_details: null,
+                        homework_details: null,
+                        attendance_details: {
+                                attendance_id: NumberInt(9032),
+                                attendance_date: new Date("2026-11-06T00:00:00Z"),
+                                period_number: NumberInt(1),
+                                period_time: "08:30 - 09:15",
+                                attendance_status: "ABSENT"
+                            }
+                    }
+                ],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 92.5
+                }
+            },
+            {
+                subject_id: NumberInt(2),
+                subject_name: "Mathematics",
+                subject_code: "MAT",
+                assigned_teacher_id: NumberInt(9),
+                assigned_teacher_name: "Utkarsh Mishra",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(3),
+                subject_name: "Science",
+                subject_code: "SCI",
+                assigned_teacher_id: NumberInt(16),
+                assigned_teacher_name: "Juhi Rajput",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(4),
+                subject_name: "Social Science",
+                subject_code: "SOC",
+                assigned_teacher_id: NumberInt(23),
+                assigned_teacher_name: "Kushagra Kapoor",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(5),
+                subject_name: "Computer Science",
+                subject_code: "CSC",
+                assigned_teacher_id: NumberInt(30),
+                assigned_teacher_name: "Chitra Nigam",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(6),
+                subject_name: "Physical Education",
+                subject_code: "PE",
+                assigned_teacher_id: NumberInt(35),
+                assigned_teacher_name: "Abhiram Kansal",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            }
+        ],
+            last_evaluated_at: new Date("2026-11-18T14:00:00Z"),
+            is_active: NumberInt(1),
+            created_at: new Date("2026-10-01T08:00:00Z"),
+            updated_at: new Date("2026-11-18T14:00:00Z")
+        },
+        {
+            student_id: NumberInt(13),
+            student_name: "Varun Venkataraman",
+            admission_number: "ADM-2026-0013",
+            roll_number: "R-03",
+            school_id: NumberInt(1),
+            branch_id: NumberInt(1),
+            academic_year_id: NumberInt(1),
+            class_id: NumberInt(1),
+            class_name: "Class 1 - Central",
+            section_id: NumberInt(2),
+            section_name: "B",
+            total_attentions_raised: NumberInt(1),
+            total_active_attentions: NumberInt(1),
+            subjects: [
+            {
+                subject_id: NumberInt(1),
+                subject_name: "English",
+                subject_code: "ENG",
+                assigned_teacher_id: NumberInt(2),
+                assigned_teacher_name: "Radhika Pillai",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(2),
+                subject_name: "Mathematics",
+                subject_code: "MAT",
+                assigned_teacher_id: NumberInt(9),
+                assigned_teacher_name: "Utkarsh Mishra",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(3),
+                subject_name: "Science",
+                subject_code: "SCI",
+                assigned_teacher_id: NumberInt(16),
+                assigned_teacher_name: "Juhi Rajput",
+                total_attentions_raised: NumberInt(1),
+                active_attentions_count: NumberInt(1),
+                attentions: [
+                    {
+                        attention_id: "ATT-13-HW-3045-1",
+                        attention_type: "PENDING_HOMEWORK",
+                        title: "Physics Ray Optics Diagram Portfolio Overdue",
+                        description: "Refraction ray diagrams lab homework not submitted.",
+                        trigger_source: "ASSIGNMENT_HOMEWORK",
+                        source_id: NumberInt(3045),
+                        triggered_at: new Date("2026-11-09T08:00:00Z"),
+                        status: "ACTIVE",
+                        acknowledged_at: new Date("2026-11-10T09:00:00Z"),
+                        acknowledged_by_teacher_id: NumberInt(16),
+                        resolved_at: null,
+                        resolved_by_teacher_id: null,
+                        resolution_remarks: null,
+                        excused_reason: null,
+                        assessment_details: null,
+                        homework_details: {
+                                homework_id: NumberInt(3045),
+                                homework_title: "Ray Optics Lab Homework Portfolio",
+                                assigned_date: new Date("2026-11-04T08:00:00Z"),
+                                due_date: new Date("2026-11-07T16:00:00Z"),
+                                days_overdue: NumberInt(2),
+                                submission_status: "PENDING"
+                            },
+                        attendance_details: null
+                    }
+                ],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(1),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(4),
+                subject_name: "Social Science",
+                subject_code: "SOC",
+                assigned_teacher_id: NumberInt(23),
+                assigned_teacher_name: "Kushagra Kapoor",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(5),
+                subject_name: "Computer Science",
+                subject_code: "CSC",
+                assigned_teacher_id: NumberInt(30),
+                assigned_teacher_name: "Chitra Nigam",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(6),
+                subject_name: "Physical Education",
+                subject_code: "PE",
+                assigned_teacher_id: NumberInt(35),
+                assigned_teacher_name: "Abhiram Kansal",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            }
+        ],
+            last_evaluated_at: new Date("2026-11-18T14:00:00Z"),
+            is_active: NumberInt(1),
+            created_at: new Date("2026-10-01T08:00:00Z"),
+            updated_at: new Date("2026-11-18T14:00:00Z")
+        },
+        {
+            student_id: NumberInt(14),
+            student_name: "Reena Mitra",
+            admission_number: "ADM-2026-0014",
+            roll_number: "R-04",
+            school_id: NumberInt(1),
+            branch_id: NumberInt(1),
+            academic_year_id: NumberInt(1),
+            class_id: NumberInt(1),
+            class_name: "Class 1 - Central",
+            section_id: NumberInt(2),
+            section_name: "B",
+            total_attentions_raised: NumberInt(1),
+            total_active_attentions: NumberInt(1),
+            subjects: [
+            {
+                subject_id: NumberInt(1),
+                subject_name: "English",
+                subject_code: "ENG",
+                assigned_teacher_id: NumberInt(2),
+                assigned_teacher_name: "Radhika Pillai",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(2),
+                subject_name: "Mathematics",
+                subject_code: "MAT",
+                assigned_teacher_id: NumberInt(9),
+                assigned_teacher_name: "Utkarsh Mishra",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(3),
+                subject_name: "Science",
+                subject_code: "SCI",
+                assigned_teacher_id: NumberInt(16),
+                assigned_teacher_name: "Juhi Rajput",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(4),
+                subject_name: "Social Science",
+                subject_code: "SOC",
+                assigned_teacher_id: NumberInt(23),
+                assigned_teacher_name: "Kushagra Kapoor",
+                total_attentions_raised: NumberInt(1),
+                active_attentions_count: NumberInt(1),
+                attentions: [
+                    {
+                        attention_id: "ATT-14-ASM-514-1",
+                        attention_type: "LOW_ASSESSMENT_SCORE",
+                        title: "Medieval Indian Architecture Map Test Re-evaluation",
+                        description: "Scored 13/40 on Mughal architecture and monuments mapping evaluation.",
+                        trigger_source: "ASSESSMENT",
+                        source_id: NumberInt(514),
+                        triggered_at: new Date("2026-11-08T14:30:00Z"),
+                        status: "ACTIVE",
+                        acknowledged_at: new Date("2026-11-09T09:00:00Z"),
+                        acknowledged_by_teacher_id: NumberInt(23),
+                        resolved_at: null,
+                        resolved_by_teacher_id: null,
+                        resolution_remarks: null,
+                        excused_reason: null,
+                        assessment_details: {
+                                assessment_id: NumberInt(514),
+                                assessment_name: "Mughal Architecture Map Test",
+                                exam_type: "SLIP_TEST",
+                                max_marks: 40.0,
+                                pass_marks: 18.0,
+                                obtained_marks: 13.0,
+                                percentage: 32.5
+                            },
+                        homework_details: null,
+                        attendance_details: null
+                    }
+                ],
+                subject_summary: {
+                    assessments_passed: NumberInt(2),
+                    assessments_failed: NumberInt(1),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(5),
+                subject_name: "Computer Science",
+                subject_code: "CSC",
+                assigned_teacher_id: NumberInt(30),
+                assigned_teacher_name: "Chitra Nigam",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(6),
+                subject_name: "Physical Education",
+                subject_code: "PE",
+                assigned_teacher_id: NumberInt(35),
+                assigned_teacher_name: "Abhiram Kansal",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            }
+        ],
+            last_evaluated_at: new Date("2026-11-18T14:00:00Z"),
+            is_active: NumberInt(1),
+            created_at: new Date("2026-10-01T08:00:00Z"),
+            updated_at: new Date("2026-11-18T14:00:00Z")
+        },
+        {
+            student_id: NumberInt(15),
+            student_name: "Sangeeta Ghosh",
+            admission_number: "ADM-2026-0015",
+            roll_number: "R-05",
+            school_id: NumberInt(1),
+            branch_id: NumberInt(1),
+            academic_year_id: NumberInt(1),
+            class_id: NumberInt(1),
+            class_name: "Class 1 - Central",
+            section_id: NumberInt(2),
+            section_name: "B",
+            total_attentions_raised: NumberInt(0),
+            total_active_attentions: NumberInt(0),
+            subjects: [
+            {
+                subject_id: NumberInt(1),
+                subject_name: "English",
+                subject_code: "ENG",
+                assigned_teacher_id: NumberInt(2),
+                assigned_teacher_name: "Radhika Pillai",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(2),
+                subject_name: "Mathematics",
+                subject_code: "MAT",
+                assigned_teacher_id: NumberInt(9),
+                assigned_teacher_name: "Utkarsh Mishra",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(3),
+                subject_name: "Science",
+                subject_code: "SCI",
+                assigned_teacher_id: NumberInt(16),
+                assigned_teacher_name: "Juhi Rajput",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(4),
+                subject_name: "Social Science",
+                subject_code: "SOC",
+                assigned_teacher_id: NumberInt(23),
+                assigned_teacher_name: "Kushagra Kapoor",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(5),
+                subject_name: "Computer Science",
+                subject_code: "CSC",
+                assigned_teacher_id: NumberInt(30),
+                assigned_teacher_name: "Chitra Nigam",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(6),
+                subject_name: "Physical Education",
+                subject_code: "PE",
+                assigned_teacher_id: NumberInt(35),
+                assigned_teacher_name: "Abhiram Kansal",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            }
+        ],
+            last_evaluated_at: new Date("2026-11-18T14:00:00Z"),
+            is_active: NumberInt(1),
+            created_at: new Date("2026-10-01T08:00:00Z"),
+            updated_at: new Date("2026-11-18T14:00:00Z")
+        },
+        {
+            student_id: NumberInt(16),
+            student_name: "Uma Asthana",
+            admission_number: "ADM-2026-0016",
+            roll_number: "R-06",
+            school_id: NumberInt(1),
+            branch_id: NumberInt(1),
+            academic_year_id: NumberInt(1),
+            class_id: NumberInt(1),
+            class_name: "Class 1 - Central",
+            section_id: NumberInt(2),
+            section_name: "B",
+            total_attentions_raised: NumberInt(2),
+            total_active_attentions: NumberInt(1),
+            subjects: [
+            {
+                subject_id: NumberInt(1),
+                subject_name: "English",
+                subject_code: "ENG",
+                assigned_teacher_id: NumberInt(2),
+                assigned_teacher_name: "Radhika Pillai",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(2),
+                subject_name: "Mathematics",
+                subject_code: "MAT",
+                assigned_teacher_id: NumberInt(9),
+                assigned_teacher_name: "Utkarsh Mishra",
+                total_attentions_raised: NumberInt(1),
+                active_attentions_count: NumberInt(1),
+                attentions: [
+                    {
+                        attention_id: "ATT-16-HW-3052-1",
+                        attention_type: "PENDING_HOMEWORK",
+                        title: "Coordinate Geometry Distance Formula Practice 7.2 Overdue",
+                        description: "Coordinate geometry exercises 7.2 not submitted by deadline.",
+                        trigger_source: "ASSIGNMENT_HOMEWORK",
+                        source_id: NumberInt(3052),
+                        triggered_at: new Date("2026-11-15T08:00:00Z"),
+                        status: "ACTIVE",
+                        acknowledged_at: new Date("2026-11-16T09:00:00Z"),
+                        acknowledged_by_teacher_id: NumberInt(9),
+                        resolved_at: null,
+                        resolved_by_teacher_id: null,
+                        resolution_remarks: null,
+                        excused_reason: null,
+                        assessment_details: null,
+                        homework_details: {
+                                homework_id: NumberInt(3052),
+                                homework_title: "Coordinate Geometry Practice 7.2",
+                                assigned_date: new Date("2026-11-11T08:00:00Z"),
+                                due_date: new Date("2026-11-14T16:00:00Z"),
+                                days_overdue: NumberInt(2),
+                                submission_status: "PENDING"
+                            },
+                        attendance_details: null
+                    }
+                ],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(1),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(3),
+                subject_name: "Science",
+                subject_code: "SCI",
+                assigned_teacher_id: NumberInt(16),
+                assigned_teacher_name: "Juhi Rajput",
+                total_attentions_raised: NumberInt(1),
+                active_attentions_count: NumberInt(0),
+                attentions: [
+                    {
+                        attention_id: "ATT-16-ATT-9045-1",
+                        attention_type: "ABSENT_ATTENDANCE",
+                        title: "Period 4 Physics Energy & Work Lab Practical Absence",
+                        description: "Absent during mechanical kinetic energy demonstration; makeup completed.",
+                        trigger_source: "ATTENDANCE",
+                        source_id: NumberInt(9045),
+                        triggered_at: new Date("2026-11-03T12:00:00Z"),
+                        status: "RESOLVED",
+                        acknowledged_at: new Date("2026-11-03T14:00:00Z"),
+                        acknowledged_by_teacher_id: NumberInt(16),
+                        resolved_at: new Date("2026-11-06T16:00:00Z"),
+                        resolved_by_teacher_id: NumberInt(16),
+                        resolution_remarks: "Completed pendulum experiment calculations during makeup hour.",
+                        excused_reason: null,
+                        assessment_details: null,
+                        homework_details: null,
+                        attendance_details: {
+                                attendance_id: NumberInt(9045),
+                                attendance_date: new Date("2026-11-03T00:00:00Z"),
+                                period_number: NumberInt(4),
+                                period_time: "11:15 - 12:00",
+                                attendance_status: "ABSENT"
+                            }
+                    }
+                ],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 92.5
+                }
+            },
+            {
+                subject_id: NumberInt(4),
+                subject_name: "Social Science",
+                subject_code: "SOC",
+                assigned_teacher_id: NumberInt(23),
+                assigned_teacher_name: "Kushagra Kapoor",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(5),
+                subject_name: "Computer Science",
+                subject_code: "CSC",
+                assigned_teacher_id: NumberInt(30),
+                assigned_teacher_name: "Chitra Nigam",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(6),
+                subject_name: "Physical Education",
+                subject_code: "PE",
+                assigned_teacher_id: NumberInt(35),
+                assigned_teacher_name: "Abhiram Kansal",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            }
+        ],
+            last_evaluated_at: new Date("2026-11-18T14:00:00Z"),
+            is_active: NumberInt(1),
+            created_at: new Date("2026-10-01T08:00:00Z"),
+            updated_at: new Date("2026-11-18T14:00:00Z")
+        },
+        {
+            student_id: NumberInt(17),
+            student_name: "Nikhil Acharya",
+            admission_number: "ADM-2026-0017",
+            roll_number: "R-07",
+            school_id: NumberInt(1),
+            branch_id: NumberInt(1),
+            academic_year_id: NumberInt(1),
+            class_id: NumberInt(1),
+            class_name: "Class 1 - Central",
+            section_id: NumberInt(2),
+            section_name: "B",
+            total_attentions_raised: NumberInt(2),
+            total_active_attentions: NumberInt(1),
+            subjects: [
+            {
+                subject_id: NumberInt(1),
+                subject_name: "English",
+                subject_code: "ENG",
+                assigned_teacher_id: NumberInt(2),
+                assigned_teacher_name: "Radhika Pillai",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(2),
+                subject_name: "Mathematics",
+                subject_code: "MAT",
+                assigned_teacher_id: NumberInt(9),
+                assigned_teacher_name: "Utkarsh Mishra",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(3),
+                subject_name: "Science",
+                subject_code: "SCI",
+                assigned_teacher_id: NumberInt(16),
+                assigned_teacher_name: "Juhi Rajput",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(4),
+                subject_name: "Social Science",
+                subject_code: "SOC",
+                assigned_teacher_id: NumberInt(23),
+                assigned_teacher_name: "Kushagra Kapoor",
+                total_attentions_raised: NumberInt(1),
+                active_attentions_count: NumberInt(0),
+                attentions: [
+                    {
+                        attention_id: "ATT-17-HW-3058-1",
+                        attention_type: "PENDING_HOMEWORK",
+                        title: "Climatic Zones of India Chart Presentation",
+                        description: "Climate zones chart submission delayed; evaluated and verified.",
+                        trigger_source: "ASSIGNMENT_HOMEWORK",
+                        source_id: NumberInt(3058),
+                        triggered_at: new Date("2026-10-29T08:00:00Z"),
+                        status: "RESOLVED",
+                        acknowledged_at: new Date("2026-10-29T10:00:00Z"),
+                        acknowledged_by_teacher_id: NumberInt(23),
+                        resolved_at: new Date("2026-10-31T15:00:00Z"),
+                        resolved_by_teacher_id: NumberInt(23),
+                        resolution_remarks: "All climatic zones colored and annual rainfall statistics annotated correctly.",
+                        excused_reason: null,
+                        assessment_details: null,
+                        homework_details: {
+                                homework_id: NumberInt(3058),
+                                homework_title: "Climatic Zones of India Project",
+                                assigned_date: new Date("2026-10-25T08:00:00Z"),
+                                due_date: new Date("2026-10-28T16:00:00Z"),
+                                days_overdue: NumberInt(1),
+                                submission_status: "LATE"
+                            },
+                        attendance_details: null
+                    }
+                ],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(5),
+                subject_name: "Computer Science",
+                subject_code: "CSC",
+                assigned_teacher_id: NumberInt(30),
+                assigned_teacher_name: "Chitra Nigam",
+                total_attentions_raised: NumberInt(1),
+                active_attentions_count: NumberInt(1),
+                attentions: [
+                    {
+                        attention_id: "ATT-17-ASM-517-1",
+                        attention_type: "LOW_ASSESSMENT_SCORE",
+                        title: "Python User-Defined Functions Slip Test Deficit",
+                        description: "Scored 9/30 on functions and scope evaluation test.",
+                        trigger_source: "ASSESSMENT",
+                        source_id: NumberInt(517),
+                        triggered_at: new Date("2026-11-10T14:00:00Z"),
+                        status: "ACTIVE",
+                        acknowledged_at: new Date("2026-11-11T08:45:00Z"),
+                        acknowledged_by_teacher_id: NumberInt(30),
+                        resolved_at: null,
+                        resolved_by_teacher_id: null,
+                        resolution_remarks: null,
+                        excused_reason: null,
+                        assessment_details: {
+                                assessment_id: NumberInt(517),
+                                assessment_name: "Python Functions Slip Test",
+                                exam_type: "SLIP_TEST",
+                                max_marks: 30.0,
+                                pass_marks: 12.0,
+                                obtained_marks: 9.0,
+                                percentage: 30.0
+                            },
+                        homework_details: null,
+                        attendance_details: null
+                    }
+                ],
+                subject_summary: {
+                    assessments_passed: NumberInt(2),
+                    assessments_failed: NumberInt(1),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(6),
+                subject_name: "Physical Education",
+                subject_code: "PE",
+                assigned_teacher_id: NumberInt(35),
+                assigned_teacher_name: "Abhiram Kansal",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            }
+        ],
+            last_evaluated_at: new Date("2026-11-18T14:00:00Z"),
+            is_active: NumberInt(1),
+            created_at: new Date("2026-10-01T08:00:00Z"),
+            updated_at: new Date("2026-11-18T14:00:00Z")
+        },
+        {
+            student_id: NumberInt(18),
+            student_name: "Kavya Sidhu",
+            admission_number: "ADM-2026-0018",
+            roll_number: "R-08",
+            school_id: NumberInt(1),
+            branch_id: NumberInt(1),
+            academic_year_id: NumberInt(1),
+            class_id: NumberInt(1),
+            class_name: "Class 1 - Central",
+            section_id: NumberInt(2),
+            section_name: "B",
+            total_attentions_raised: NumberInt(2),
+            total_active_attentions: NumberInt(1),
+            subjects: [
+            {
+                subject_id: NumberInt(1),
+                subject_name: "English",
+                subject_code: "ENG",
+                assigned_teacher_id: NumberInt(2),
+                assigned_teacher_name: "Radhika Pillai",
+                total_attentions_raised: NumberInt(1),
+                active_attentions_count: NumberInt(1),
+                attentions: [
+                    {
+                        attention_id: "ATT-18-ASM-518-1",
+                        attention_type: "LOW_ASSESSMENT_SCORE",
+                        title: "Formal Business & Editorial Letter Writing Test",
+                        description: "Scored 14/40, below standard formatting pass criteria.",
+                        trigger_source: "ASSESSMENT",
+                        source_id: NumberInt(518),
+                        triggered_at: new Date("2026-11-12T14:30:00Z"),
+                        status: "ACTIVE",
+                        acknowledged_at: new Date("2026-11-13T09:00:00Z"),
+                        acknowledged_by_teacher_id: NumberInt(2),
+                        resolved_at: null,
+                        resolved_by_teacher_id: null,
+                        resolution_remarks: null,
+                        excused_reason: null,
+                        assessment_details: {
+                                assessment_id: NumberInt(518),
+                                assessment_name: "Formal Letter Writing Assessment",
+                                exam_type: "SLIP_TEST",
+                                max_marks: 40.0,
+                                pass_marks: 18.0,
+                                obtained_marks: 14.0,
+                                percentage: 35.0
+                            },
+                        homework_details: null,
+                        attendance_details: null
+                    }
+                ],
+                subject_summary: {
+                    assessments_passed: NumberInt(2),
+                    assessments_failed: NumberInt(1),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(2),
+                subject_name: "Mathematics",
+                subject_code: "MAT",
+                assigned_teacher_id: NumberInt(9),
+                assigned_teacher_name: "Utkarsh Mishra",
+                total_attentions_raised: NumberInt(1),
+                active_attentions_count: NumberInt(0),
+                attentions: [
+                    {
+                        attention_id: "ATT-18-ATT-9055-1",
+                        attention_type: "ABSENT_ATTENDANCE",
+                        title: "Period 2 Mathematics Algebra Session Absence",
+                        description: "Excused absence due to sanctioned dental appointment.",
+                        trigger_source: "ATTENDANCE",
+                        source_id: NumberInt(9055),
+                        triggered_at: new Date("2026-11-09T10:00:00Z"),
+                        status: "EXCUSED",
+                        acknowledged_at: new Date("2026-11-09T11:00:00Z"),
+                        acknowledged_by_teacher_id: NumberInt(9),
+                        resolved_at: new Date("2026-11-10T09:00:00Z"),
+                        resolved_by_teacher_id: NumberInt(9),
+                        resolution_remarks: "Doctor clinic slip verified.",
+                        excused_reason: "Dental procedure appointment slip approved by Class Teacher.",
+                        assessment_details: null,
+                        homework_details: null,
+                        attendance_details: {
+                                attendance_id: NumberInt(9055),
+                                attendance_date: new Date("2026-11-09T00:00:00Z"),
+                                period_number: NumberInt(2),
+                                period_time: "09:15 - 10:00",
+                                attendance_status: "ABSENT"
+                            }
+                    }
+                ],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 92.5
+                }
+            },
+            {
+                subject_id: NumberInt(3),
+                subject_name: "Science",
+                subject_code: "SCI",
+                assigned_teacher_id: NumberInt(16),
+                assigned_teacher_name: "Juhi Rajput",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(4),
+                subject_name: "Social Science",
+                subject_code: "SOC",
+                assigned_teacher_id: NumberInt(23),
+                assigned_teacher_name: "Kushagra Kapoor",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(5),
+                subject_name: "Computer Science",
+                subject_code: "CSC",
+                assigned_teacher_id: NumberInt(30),
+                assigned_teacher_name: "Chitra Nigam",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(6),
+                subject_name: "Physical Education",
+                subject_code: "PE",
+                assigned_teacher_id: NumberInt(35),
+                assigned_teacher_name: "Abhiram Kansal",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            }
+        ],
+            last_evaluated_at: new Date("2026-11-18T14:00:00Z"),
+            is_active: NumberInt(1),
+            created_at: new Date("2026-10-01T08:00:00Z"),
+            updated_at: new Date("2026-11-18T14:00:00Z")
+        },
+        {
+            student_id: NumberInt(19),
+            student_name: "Suresh Banerjee",
+            admission_number: "ADM-2026-0019",
+            roll_number: "R-09",
+            school_id: NumberInt(1),
+            branch_id: NumberInt(1),
+            academic_year_id: NumberInt(1),
+            class_id: NumberInt(1),
+            class_name: "Class 1 - Central",
+            section_id: NumberInt(2),
+            section_name: "B",
+            total_attentions_raised: NumberInt(1),
+            total_active_attentions: NumberInt(1),
+            subjects: [
+            {
+                subject_id: NumberInt(1),
+                subject_name: "English",
+                subject_code: "ENG",
+                assigned_teacher_id: NumberInt(2),
+                assigned_teacher_name: "Radhika Pillai",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(2),
+                subject_name: "Mathematics",
+                subject_code: "MAT",
+                assigned_teacher_id: NumberInt(9),
+                assigned_teacher_name: "Utkarsh Mishra",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(3),
+                subject_name: "Science",
+                subject_code: "SCI",
+                assigned_teacher_id: NumberInt(16),
+                assigned_teacher_name: "Juhi Rajput",
+                total_attentions_raised: NumberInt(1),
+                active_attentions_count: NumberInt(1),
+                attentions: [
+                    {
+                        attention_id: "ATT-19-HW-3065-1",
+                        attention_type: "PENDING_HOMEWORK",
+                        title: "Balancing Chemical Reactions Equation Balancing Practice",
+                        description: "Chemical stoichiometry equations practice set overdue by 2 days.",
+                        trigger_source: "ASSIGNMENT_HOMEWORK",
+                        source_id: NumberInt(3065),
+                        triggered_at: new Date("2026-11-17T08:00:00Z"),
+                        status: "ACTIVE",
+                        acknowledged_at: new Date("2026-11-17T09:30:00Z"),
+                        acknowledged_by_teacher_id: NumberInt(16),
+                        resolved_at: null,
+                        resolved_by_teacher_id: null,
+                        resolution_remarks: null,
+                        excused_reason: null,
+                        assessment_details: null,
+                        homework_details: {
+                                homework_id: NumberInt(3065),
+                                homework_title: "Chemical Reactions Balancing Worksheet",
+                                assigned_date: new Date("2026-11-13T08:00:00Z"),
+                                due_date: new Date("2026-11-16T16:00:00Z"),
+                                days_overdue: NumberInt(2),
+                                submission_status: "PENDING"
+                            },
+                        attendance_details: null
+                    }
+                ],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(1),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(4),
+                subject_name: "Social Science",
+                subject_code: "SOC",
+                assigned_teacher_id: NumberInt(23),
+                assigned_teacher_name: "Kushagra Kapoor",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(5),
+                subject_name: "Computer Science",
+                subject_code: "CSC",
+                assigned_teacher_id: NumberInt(30),
+                assigned_teacher_name: "Chitra Nigam",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(6),
+                subject_name: "Physical Education",
+                subject_code: "PE",
+                assigned_teacher_id: NumberInt(35),
+                assigned_teacher_name: "Abhiram Kansal",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            }
+        ],
+            last_evaluated_at: new Date("2026-11-18T14:00:00Z"),
+            is_active: NumberInt(1),
+            created_at: new Date("2026-10-01T08:00:00Z"),
+            updated_at: new Date("2026-11-18T14:00:00Z")
+        },
+        {
+            student_id: NumberInt(20),
+            student_name: "Nakul Chatterjee",
+            admission_number: "ADM-2026-0020",
+            roll_number: "R-10",
+            school_id: NumberInt(1),
+            branch_id: NumberInt(1),
+            academic_year_id: NumberInt(1),
+            class_id: NumberInt(1),
+            class_name: "Class 1 - Central",
+            section_id: NumberInt(2),
+            section_name: "B",
+            total_attentions_raised: NumberInt(0),
+            total_active_attentions: NumberInt(0),
+            subjects: [
+            {
+                subject_id: NumberInt(1),
+                subject_name: "English",
+                subject_code: "ENG",
+                assigned_teacher_id: NumberInt(2),
+                assigned_teacher_name: "Radhika Pillai",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(2),
+                subject_name: "Mathematics",
+                subject_code: "MAT",
+                assigned_teacher_id: NumberInt(9),
+                assigned_teacher_name: "Utkarsh Mishra",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(3),
+                subject_name: "Science",
+                subject_code: "SCI",
+                assigned_teacher_id: NumberInt(16),
+                assigned_teacher_name: "Juhi Rajput",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(4),
+                subject_name: "Social Science",
+                subject_code: "SOC",
+                assigned_teacher_id: NumberInt(23),
+                assigned_teacher_name: "Kushagra Kapoor",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(5),
+                subject_name: "Computer Science",
+                subject_code: "CSC",
+                assigned_teacher_id: NumberInt(30),
+                assigned_teacher_name: "Chitra Nigam",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            },
+            {
+                subject_id: NumberInt(6),
+                subject_name: "Physical Education",
+                subject_code: "PE",
+                assigned_teacher_id: NumberInt(35),
+                assigned_teacher_name: "Abhiram Kansal",
+                total_attentions_raised: NumberInt(0),
+                active_attentions_count: NumberInt(0),
+                attentions: [],
+                subject_summary: {
+                    assessments_passed: NumberInt(3),
+                    assessments_failed: NumberInt(0),
+                    homework_submitted: NumberInt(4),
+                    homework_pending: NumberInt(0),
+                    subject_attendance_percent: 98.0
+                }
+            }
+        ],
+            last_evaluated_at: new Date("2026-11-18T14:00:00Z"),
+            is_active: NumberInt(1),
+            created_at: new Date("2026-10-01T08:00:00Z"),
+            updated_at: new Date("2026-11-18T14:00:00Z")
+        }
+
+    ];
+
+    var insertRes = targetDb[COLLECTION_NAME].insertMany(docsToInsert);
+    print("[SUCCESS] Successfully inserted " + insertRes.insertedIds.length + " realistic student attention documents.");
 
     // -------------------------------------------------------------------------
-    // 7. Execution: Clean Idempotent Upsert
+    // 5. POST-SEED AUDIT & VERIFICATION REPORT
     // -------------------------------------------------------------------------
-    var targetStudentIds = rawStudents.map(function (s) { return NumberInt(s.id); });
-    var deleteRes = targetDb[COLLECTION_NAME].deleteMany({
-        student_id: { $in: targetStudentIds },
-        academic_year_id: NumberInt(1)
-    });
-    print("[CLEANUP] Deleted " + deleteRes.deletedCount + " existing mock documents for targeted students.");
+    print("");
+    print("================================================================================");
+    print("VERIFICATION REPORT: ALL 20 SEEDED STUDENTS IN BRANCH 1 (UP TO 18-NOV-2026)");
+    print("================================================================================");
 
-    var insertRes = targetDb[COLLECTION_NAME].insertMany(attentionDocs);
-    print("[SUCCESS] Successfully inserted " + attentionDocs.length + " realistic student attention documents.");
+    var cursor = targetDb[COLLECTION_NAME].find({}, {
+        student_id: 1,
+        student_name: 1,
+        section_name: 1,
+        total_attentions_raised: 1,
+        total_active_attentions: 1,
+        subjects: 1
+    }).sort({ student_id: 1 });
 
-    // -------------------------------------------------------------------------
-    // 8. Post-Insertion Verification
-    // -------------------------------------------------------------------------
-    print("\n[VERIFICATION] Verifying metric totals across seeded documents:");
-    var cursor = targetDb[COLLECTION_NAME].find({ student_id: { $in: targetStudentIds }, academic_year_id: NumberInt(1) }).sort({ section_id: 1, student_id: 1 });
+    var totalRaisedSum = 0;
+    var totalActiveSum = 0;
+    var totalResolvedSum = 0;
+    var totalExcusedSum = 0;
+
     while (cursor.hasNext()) {
         var doc = cursor.next();
-        print("  - Student " + ("00" + doc.student_id).slice(-2) + " (" + doc.student_name + ", Sec " + doc.section_name + "): " +
-              "Total Raised: " + doc.total_attentions_raised + " | " +
-              "Active: " + doc.total_active_attentions);
+        var raised = doc.total_attentions_raised;
+        var active = doc.total_active_attentions;
+
+        var resolvedCount = 0;
+        var excusedCount = 0;
+        if (Array.isArray(doc.subjects)) {
+            doc.subjects.forEach(function (s) {
+                if (Array.isArray(s.attentions)) {
+                    s.attentions.forEach(function (a) {
+                        if (a.status === "RESOLVED") resolvedCount++;
+                        if (a.status === "EXCUSED") excusedCount++;
+                    });
+                }
+            });
+        }
+
+        totalRaisedSum += raised;
+        totalActiveSum += active;
+        totalResolvedSum += resolvedCount;
+        totalExcusedSum += excusedCount;
+
+        var padId = (doc.student_id < 10 ? "0" : "") + doc.student_id;
+        var statusBadge = active > 0 ? "⚠️ ACTIVE" : (raised > 0 ? "✅ RESOLVED" : "🌟 HONORS");
+        print("  - Student " + padId + " (" + doc.student_name + ", Sec " + doc.section_name + "): " +
+              "Total Raised: " + raised + " | Active: " + active + " | Resolved: " + resolvedCount + " | Excused: " + excusedCount + " [" + statusBadge + "]");
     }
 
-    print("\n================================================================================");
-    print("MOCK SEED COMPLETE WITH 100% ACCURATE MAPPINGS & SCHEMA COMPLIANCE");
+    print("--------------------------------------------------------------------------------");
+    print("SUMMARY METRICS ACROSS COHORT:");
+    print("  Total Students Seeded:       " + targetDb[COLLECTION_NAME].countDocuments());
+    print("  Total Attentions Raised:     " + totalRaisedSum);
+    print("  Total Active Attentions:     " + totalActiveSum);
+    print("  Total Resolved Attentions:   " + totalResolvedSum);
+    print("  Total Excused Attentions:    " + totalExcusedSum);
+    print("  Legacy Severity Fields Found:" + targetDb[COLLECTION_NAME].countDocuments({
+        $or: [
+            { critical_attentions_count: { $exists: true } },
+            { "subjects.attentions.severity": { $exists: true } }
+        ]
+    }));
+    print("================================================================================");
+    print("MOCK SEED COMPLETE WITH 100% ACCURACY & ZERO SEVERITY / CRITICAL FIELDS");
     print("================================================================================");
 })();

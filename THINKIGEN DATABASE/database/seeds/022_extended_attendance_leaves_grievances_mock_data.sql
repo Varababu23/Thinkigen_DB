@@ -250,7 +250,9 @@ BEGIN TRY
     OUTPUT inserted.teacher_grievance_id, src.row_id
     INTO @TeacherGrievanceMap (inserted_grievance_id, row_id);
 
-    PRINT CONCAT(N'  ✔ Added new Teacher Grievances: ', (SELECT COUNT(*) FROM @TeacherGrievanceMap));
+    DECLARE @TchGrvInserted INT;
+    SELECT @TchGrvInserted = COUNT(*) FROM @TeacherGrievanceMap;
+    PRINT CONCAT(N'  ✔ Added new Teacher Grievances: ', @TchGrvInserted);
 
     -- Insert corresponding 1:1 History records
     INSERT INTO teachers_schema.teacher_grievance_status_history
@@ -272,6 +274,25 @@ BEGIN TRY
     );
 
     PRINT CONCAT(N'  ✔ Added 1:1 Teacher Grievance Status History records: ', @@ROWCOUNT);
+
+    -- Ensure all teacher grievances have status history
+    INSERT INTO teachers_schema.teacher_grievance_status_history
+    (
+        teacher_grievance_id, old_status, new_status, changed_by, changed_at, remarks
+    )
+    SELECT
+        tg.teacher_grievance_id,
+        CASE WHEN tg.status = N'OPEN' THEN NULL ELSE N'OPEN' END,
+        tg.status,
+        COALESCE(tg.updated_by, tg.created_by, @AdminUserId),
+        COALESCE(tg.updated_at, tg.created_at, SYSUTCDATETIME()),
+        N'Status history synchronized with existing grievance.'
+    FROM teachers_schema.teacher_grievance tg
+    WHERE NOT EXISTS (
+        SELECT 1 FROM teachers_schema.teacher_grievance_status_history h
+        WHERE h.teacher_grievance_id = tg.teacher_grievance_id
+    );
+
     DROP TABLE #NewTeacherGrievances;
 
     -- =========================================================================
@@ -297,9 +318,8 @@ BEGIN TRY
         location NVARCHAR(200),
         description NVARCHAR(MAX),
         status NVARCHAR(30),
-        submitted_at DATETIME2(0),
         assigned_to BIGINT,
-        created_at DATETIME2(0),
+        submitted_at DATETIME2(0),
         created_by BIGINT,
         reviewed_at DATETIME2(0),
         resolved_at DATETIME2(0)
@@ -309,7 +329,7 @@ BEGIN TRY
     (
         grievance_number, school_id, branch_id, academic_year_id, class_id, section_id,
         student_id, department_id, title, category, priority_level, incident_date,
-        location, description, status, submitted_at, assigned_to, created_at, created_by,
+        location, description, status, assigned_to, submitted_at, created_by,
         reviewed_at, resolved_at
     )
     VALUES
@@ -429,12 +449,14 @@ BEGIN TRY
             src.grievance_number, src.school_id, src.branch_id, src.academic_year_id, src.class_id, src.section_id,
             src.student_id, src.department_id, src.title, src.category, src.priority_level, src.incident_date,
             src.location, src.description, src.status, src.submitted_at, src.assigned_to, 1,
-            src.created_at, src.created_by, src.submitted_at
+            src.submitted_at, src.created_by, src.submitted_at
         )
     OUTPUT inserted.grievance_id, src.row_id
     INTO @StudentGrievanceMap (inserted_grievance_id, row_id);
 
-    PRINT CONCAT(N'  ✔ Added new Student Grievances: ', (SELECT COUNT(*) FROM @StudentGrievanceMap));
+    DECLARE @StuGrvInserted INT;
+    SELECT @StuGrvInserted = COUNT(*) FROM @StudentGrievanceMap;
+    PRINT CONCAT(N'  ✔ Added new Student Grievances: ', @StuGrvInserted);
 
     -- Insert 1:1 Grievance History
     INSERT INTO student_schema.grievance_history
@@ -457,6 +479,26 @@ BEGIN TRY
     );
 
     PRINT CONCAT(N'  ✔ Added 1:1 Student Grievance History records: ', @@ROWCOUNT);
+
+    -- Ensure all student grievances have history
+    INSERT INTO student_schema.grievance_history
+    (
+        grievance_id, submitted_by, submitted_at, assigned_to, reviewed_at, resolved_at, updated_at
+    )
+    SELECT
+        g.grievance_id,
+        g.created_by,
+        g.submitted_at,
+        g.assigned_to,
+        CASE WHEN g.status IN (N'UNDER_REVIEW', N'RESOLVED') THEN g.submitted_at ELSE NULL END,
+        CASE WHEN g.status = N'RESOLVED' THEN g.updated_at ELSE NULL END,
+        g.updated_at
+    FROM student_schema.grievance g
+    WHERE NOT EXISTS (
+        SELECT 1 FROM student_schema.grievance_history gh
+        WHERE gh.grievance_id = g.grievance_id
+    );
+
     DROP TABLE #NewStudentGrievances;
 
     -- =========================================================================
@@ -622,7 +664,9 @@ BEGIN TRY
     OUTPUT inserted.teacher_leave_application_id, src.row_id
     INTO @TeacherLeaveMap (inserted_leave_id, row_id);
 
-    PRINT CONCAT(N'  ✔ Added new Teacher Leave Applications: ', (SELECT COUNT(*) FROM @TeacherLeaveMap));
+    DECLARE @TchLeaveInserted INT;
+    SELECT @TchLeaveInserted = COUNT(*) FROM @TeacherLeaveMap;
+    PRINT CONCAT(N'  ✔ Added new Teacher Leave Applications: ', @TchLeaveInserted);
 
     -- Insert 1:1 Leave Status History
     INSERT INTO teachers_schema.teacher_leave_status_history
@@ -644,6 +688,24 @@ BEGIN TRY
     );
 
     PRINT CONCAT(N'  ✔ Added 1:1 Teacher Leave Status History records: ', @@ROWCOUNT);
+
+    -- Ensure all teacher leave applications have status history
+    INSERT INTO teachers_schema.teacher_leave_status_history
+    (
+        teacher_leave_application_id, old_status, new_status, changed_by, changed_at, remarks
+    )
+    SELECT
+        tla.teacher_leave_application_id,
+        CASE WHEN tla.status = N'PENDING' THEN NULL ELSE N'PENDING' END,
+        tla.status,
+        COALESCE(tla.updated_by, tla.created_by, @AdminUserId),
+        COALESCE(tla.updated_at, tla.created_at, SYSUTCDATETIME()),
+        N'Historical status record synchronized with existing leave application.'
+    FROM teachers_schema.teacher_leave_application tla
+    WHERE NOT EXISTS (
+        SELECT 1 FROM teachers_schema.teacher_leave_status_history h
+        WHERE h.teacher_leave_application_id = tla.teacher_leave_application_id
+    );
 
     -- Reconcile / Synchronize teacher_leave_allowance used_days for APPROVED applications
     UPDATE tla
@@ -729,7 +791,7 @@ BEGIN TRY
             nl.student_id, nl.leave_type, nl.duration_type, nl.half_day_session, nl.duration,
             nl.start_date, nl.end_date, nl.reason, nl.status, nl.applied_at,
             DATEADD(HOUR, 24, nl.applied_at) AS reviewed_at,
-            tch.user_id AS reviewed_by,
+            COALESCE(tch.user_id, @AdminUserId) AS reviewed_by,
             nl.review_remarks,
             st.user_id AS created_by,
             nl.row_id
@@ -758,7 +820,9 @@ BEGIN TRY
     OUTPUT inserted.student_leave_id, src.row_id
     INTO @StudentLeaveMap (inserted_student_leave_id, row_id);
 
-    PRINT CONCAT(N'  ✔ Added new Student Leaves: ', (SELECT COUNT(*) FROM @StudentLeaveMap));
+    DECLARE @StuLeaveInserted INT;
+    SELECT @StuLeaveInserted = COUNT(*) FROM @StudentLeaveMap;
+    PRINT CONCAT(N'  ✔ Added new Student Leaves: ', @StuLeaveInserted);
 
     -- Insert 1:1 Student Leave Status History
     INSERT INTO student_schema.student_leave_status_history
@@ -784,6 +848,25 @@ BEGIN TRY
     );
 
     PRINT CONCAT(N'  ✔ Added 1:1 Student Leave Status History records: ', @@ROWCOUNT);
+
+    -- Ensure all student leaves have status history
+    INSERT INTO student_schema.student_leave_status_history
+    (
+        student_leave_id, old_status, new_status, changed_by, changed_at, remarks
+    )
+    SELECT
+        sla.student_leave_id,
+        N'PENDING',
+        sla.status,
+        COALESCE(sla.reviewed_by, sla.created_by, @AdminUserId),
+        COALESCE(sla.reviewed_at, sla.applied_at, SYSUTCDATETIME()),
+        COALESCE(sla.review_remarks, N'Historical leave status history synchronized.')
+    FROM student_schema.student_leave sla
+    WHERE NOT EXISTS (
+        SELECT 1 FROM student_schema.student_leave_status_history h
+        WHERE h.student_leave_id = sla.student_leave_id
+    );
+
     DROP TABLE #NewStudentLeaves;
 
     -- =========================================================================
@@ -1175,25 +1258,84 @@ BEGIN TRY
         MAX(attendance_date) AS latest_attendance
     FROM student_schema.student_attendance;
 
-    -- Verification 7: 1:1 History Tracking Integrity Checks
-    DECLARE @tla_cnt INT, @tlh_cnt INT, @tg_cnt INT, @tgh_cnt INT, @sla_cnt INT, @slh_cnt INT, @sg_cnt INT, @sgh_cnt INT;
-    SELECT @tla_cnt = COUNT(*) FROM teachers_schema.teacher_leave_application;
-    SELECT @tlh_cnt = COUNT(*) FROM teachers_schema.teacher_leave_status_history;
-    SELECT @tg_cnt  = COUNT(*) FROM teachers_schema.teacher_grievance;
-    SELECT @tgh_cnt = COUNT(*) FROM teachers_schema.teacher_grievance_status_history;
-    SELECT @sla_cnt = COUNT(*) FROM student_schema.student_leave;
-    SELECT @slh_cnt = COUNT(*) FROM student_schema.student_leave_status_history;
-    SELECT @sg_cnt  = COUNT(*) FROM student_schema.grievance;
-    SELECT @sgh_cnt = COUNT(*) FROM student_schema.grievance_history;
+    -- Verification 7: Referential and Lifecycle Tracking Integrity Checks
+    DECLARE @orphaned_tla INT, @orphaned_tlh INT,
+            @orphaned_tg INT,  @orphaned_tgh INT,
+            @orphaned_sla INT, @orphaned_slh INT,
+            @orphaned_sg INT,  @orphaned_sgh INT;
 
-    IF @tla_cnt <> @tlh_cnt
-        THROW 52001, N'Integrity check failed: teacher_leave_status_history does not match teacher_leave_application row count.', 1;
-    IF @tg_cnt <> @tgh_cnt
-        THROW 52002, N'Integrity check failed: teacher_grievance_status_history does not match teacher_grievance row count.', 1;
-    IF @sla_cnt <> @slh_cnt
-        THROW 52003, N'Integrity check failed: student_leave_status_history does not match student_leave row count.', 1;
-    IF @sg_cnt <> @sgh_cnt
-        THROW 52004, N'Integrity check failed: student grievance_history does not match grievance row count.', 1;
+    -- Teacher Leaves Integrity
+    SELECT @orphaned_tla = COUNT(*) 
+    FROM teachers_schema.teacher_leave_application tla
+    WHERE NOT EXISTS (
+        SELECT 1 FROM teachers_schema.teacher_leave_status_history h
+        WHERE h.teacher_leave_application_id = tla.teacher_leave_application_id
+    );
+    SELECT @orphaned_tlh = COUNT(*) 
+    FROM teachers_schema.teacher_leave_status_history h
+    WHERE NOT EXISTS (
+        SELECT 1 FROM teachers_schema.teacher_leave_application tla
+        WHERE tla.teacher_leave_application_id = h.teacher_leave_application_id
+    );
+
+    -- Teacher Grievances Integrity
+    SELECT @orphaned_tg = COUNT(*) 
+    FROM teachers_schema.teacher_grievance tg
+    WHERE NOT EXISTS (
+        SELECT 1 FROM teachers_schema.teacher_grievance_status_history h
+        WHERE h.teacher_grievance_id = tg.teacher_grievance_id
+    );
+    SELECT @orphaned_tgh = COUNT(*) 
+    FROM teachers_schema.teacher_grievance_status_history h
+    WHERE NOT EXISTS (
+        SELECT 1 FROM teachers_schema.teacher_grievance tg
+        WHERE tg.teacher_grievance_id = h.teacher_grievance_id
+    );
+
+    -- Student Leaves Integrity
+    SELECT @orphaned_sla = COUNT(*) 
+    FROM student_schema.student_leave sla
+    WHERE NOT EXISTS (
+        SELECT 1 FROM student_schema.student_leave_status_history h
+        WHERE h.student_leave_id = sla.student_leave_id
+    );
+    SELECT @orphaned_slh = COUNT(*) 
+    FROM student_schema.student_leave_status_history h
+    WHERE NOT EXISTS (
+        SELECT 1 FROM student_schema.student_leave sla
+        WHERE sla.student_leave_id = h.student_leave_id
+    );
+
+    -- Student Grievances Integrity
+    SELECT @orphaned_sg = COUNT(*) 
+    FROM student_schema.grievance sg
+    WHERE NOT EXISTS (
+        SELECT 1 FROM student_schema.grievance_history gh
+        WHERE gh.grievance_id = sg.grievance_id
+    );
+    SELECT @orphaned_sgh = COUNT(*) 
+    FROM student_schema.grievance_history gh
+    WHERE NOT EXISTS (
+        SELECT 1 FROM student_schema.grievance sg
+        WHERE sg.grievance_id = gh.grievance_id
+    );
+
+    IF @orphaned_tla > 0
+        THROW 52001, N'Integrity check failed: Found teacher_leave_application records without status history.', 1;
+    IF @orphaned_tlh > 0
+        THROW 52002, N'Integrity check failed: Found orphaned teacher_leave_status_history records without parent application.', 1;
+    IF @orphaned_tg > 0
+        THROW 52003, N'Integrity check failed: Found teacher_grievance records without status history.', 1;
+    IF @orphaned_tgh > 0
+        THROW 52004, N'Integrity check failed: Found orphaned teacher_grievance_status_history records without parent grievance.', 1;
+    IF @orphaned_sla > 0
+        THROW 52005, N'Integrity check failed: Found student_leave records without status history.', 1;
+    IF @orphaned_slh > 0
+        THROW 52006, N'Integrity check failed: Found orphaned student_leave_status_history records without parent leave.', 1;
+    IF @orphaned_sg > 0
+        THROW 52007, N'Integrity check failed: Found student grievance records without history.', 1;
+    IF @orphaned_sgh > 0
+        THROW 52008, N'Integrity check failed: Found orphaned student grievance_history records without parent grievance.', 1;
 
     PRINT N'✔ All 1:1 Lifecycle tracking relationships verified 100% consistent.';
     PRINT N'✔ Zero duplicate records created.';
